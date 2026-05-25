@@ -1,0 +1,1602 @@
+{
+  "name": "Green Roads — Weekly Tracker + Low Performance Emailer",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Green Roads — Weekly Publisher Tracker + Low Performance Emailer\n\n**Schedule:** Every Monday 08:00 AM UTC\n**Detects:** New publishers · weekly sales · zero activity · low clicks\n**Emails:** Publishers with < 100 clicks via Gmail (once per week max)\n**Output:** Tab 4, Tab 5, Tab 6, Tab 7\n**Depends on:** Tab 1 from Workflow 1 as master source of truth\n\n### Workflow variables required:\n- `AWIN_ADVERTISER_ID`\n- `SHEET_ID`\n- `LOW_CLICK_THRESHOLD` (default 100)\n- `ZERO_ACTIVITY_THRESHOLD` (default 2)\n- `HUNTER_MONTHLY_LIMIT` (default 480)\n\n### Credentials to map after import:\n- `AWIN_API_TOKEN` (httpHeaderAuth → Authorization: Bearer …)\n- `AWIN_SESSION_COOKIE` (httpHeaderAuth → Cookie: …)\n- `HUNTER_API_KEY` (httpQueryAuth → api_key=…)\n- `GOOGLE_SHEETS_OAUTH` (Google Sheets OAuth2)\n- `GMAIL_OAUTH` (Gmail OAuth2)\n- Sender name + address are stored on the Gmail node parameters",
+        "height": 480,
+        "width": 540,
+        "color": 4
+      },
+      "id": "sticky_header",
+      "name": "Sticky — Workflow Header",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-400, -520]
+    },
+    {
+      "parameters": {
+        "content": "### Section W1 — Triggers\nMonday 08:00 UTC + manual.",
+        "height": 200,
+        "width": 320,
+        "color": 5
+      },
+      "id": "sticky_w1",
+      "name": "Sticky — Section W1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-400, 60]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "w1a",
+      "name": "Weekly Trigger — Every Monday 08:00 AM UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-340, 160]
+    },
+    {
+      "parameters": {},
+      "id": "w1b",
+      "name": "Manual Trigger — Test Weekly Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-340, 320]
+    },
+    {
+      "parameters": {
+        "content": "### Section W2 — Generate week date range\nLast Mon→Sun derived from `now`.",
+        "height": 200,
+        "width": 320,
+        "color": 5
+      },
+      "id": "sticky_w2",
+      "name": "Sticky — Section W2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-40, 60]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const now = new Date();\nconst dayOfWeek = now.getDay();\nconst daysToLastMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;\n\nconst lastMonday = new Date(now);\nlastMonday.setDate(now.getDate() - daysToLastMonday - 7);\nlastMonday.setHours(0, 0, 0, 0);\n\nconst lastSunday = new Date(lastMonday);\nlastSunday.setDate(lastMonday.getDate() + 6);\nlastSunday.setHours(23, 59, 59, 0);\n\nconst fmt = (d) => d.toISOString().split('T')[0];\n\nreturn [{\n  json: {\n    week_start: fmt(lastMonday),\n    week_end:   fmt(lastSunday),\n    week_label: `Week of ${fmt(lastMonday)} to ${fmt(lastSunday)}`\n  }\n}];"
+      },
+      "id": "w2",
+      "name": "Generate Last Week Date Range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [40, 240]
+    },
+    {
+      "parameters": {
+        "content": "### Section W3 — Detect new publishers this week\nAWIN list ↔ Master sheet diff.",
+        "height": 220,
+        "width": 760,
+        "color": 5
+      },
+      "id": "sticky_w3",
+      "name": "Sticky — Section W3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 60]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.awin.com/advertisers/{{ $vars.AWIN_ADVERTISER_ID }}/publishers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "w3a",
+      "name": "AWIN — Get All Current Publishers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [320, 240],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AWIN_API_TOKEN_ID",
+          "name": "AWIN_API_TOKEN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "w3a_wait",
+      "name": "Wait 3s — After AWIN Current Publishers",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [520, 240],
+      "webhookId": "wait-w3a"
+    },
+    {
+      "parameters": {
+        "content": "Wait 3000 ms — AWIN 20 req/min hard limit.",
+        "height": 80,
+        "width": 220,
+        "color": 6
+      },
+      "id": "sticky_w3a_wait",
+      "name": "Sticky — Wait W3A",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [500, 360]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Publishers",
+          "mode": "name"
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      },
+      "id": "w3b",
+      "name": "Read Known Publisher IDs from Master Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [720, 240],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const allCurrent = $('AWIN — Get All Current Publishers').all()\n  .flatMap(p => Array.isArray(p.json) ? p.json : [p.json])\n  .map(p => ({\n    id:            String(p.id),\n    name:          p.name,\n    primaryRegion: p.primaryRegion,\n    primaryType:   p.primaryType\n  }));\n\nconst knownIds = new Set(\n  $('Read Known Publisher IDs from Master Tab').all()\n    .map(r => String(r.json.publisher_id))\n);\n\nconst newPublishers = allCurrent.filter(p => !knownIds.has(p.id));\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.newPublishersThisWeek = newPublishers.length;\n\nreturn newPublishers.length > 0\n  ? newPublishers.map(p => ({ json: { ...p, detected_as: 'new_this_week' } }))\n  : [{ json: { no_new_publishers: true } }];"
+      },
+      "id": "w3c",
+      "name": "Detect New Publishers This Week",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 240]
+    },
+    {
+      "parameters": {
+        "content": "### Section W4 — Enrich new publishers (per item via SplitInBatches)\nProfile scrape → Hunter fallback → save to New + Master tabs.",
+        "height": 240,
+        "width": 1500,
+        "color": 5
+      },
+      "id": "sticky_w4",
+      "name": "Sticky — Section W4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1140, 60]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond_no_new",
+              "leftValue": "={{ $json.no_new_publishers }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEqual",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w4a",
+      "name": "IF: Any New Publishers This Week?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1180, 240]
+    },
+    {
+      "parameters": {
+        "content": "TRUE → enrich each new publisher.\nFALSE → skip Section W4 entirely.",
+        "height": 90,
+        "width": 280,
+        "color": 6
+      },
+      "id": "sticky_w4a",
+      "name": "Sticky — IF Any New",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1160, 380]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "w4_batch",
+      "name": "Batch — One New Publisher at a Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1380, 240]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://ui.awin.com/profile/publisher/{{ $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml"
+            },
+            {
+              "name": "Referer",
+              "value": "https://ui.awin.com/"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "w4b",
+      "name": "AWIN UI — Scrape New Publisher Profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 240],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AWIN_SESSION_COOKIE_ID",
+          "name": "AWIN_SESSION_COOKIE"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "seconds"
+      },
+      "id": "w4b_wait",
+      "name": "Wait 4s — After New Profile Scrape",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1760, 240],
+      "webhookId": "wait-w4b"
+    },
+    {
+      "parameters": {
+        "content": "Wait 4000 ms — session-ban prevention.",
+        "height": 80,
+        "width": 220,
+        "color": 6
+      },
+      "id": "sticky_w4b_wait",
+      "name": "Sticky — Wait W4B",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1740, 360]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const html = $json.data || $json.body || '';\n\nconst emailMatch = html.match(/href=[\"']mailto:([^\"']+)[\"']/i);\nconst email = emailMatch ? emailMatch[1].trim().toLowerCase() : null;\n\nconst phoneMatch = html.match(/(?:tel:|phone|mobile|contact)[\\s\\S]{0,50}?([\\+\\d][\\d\\s\\-\\(\\)]{6,20})/i);\nconst phone = phoneMatch ? phoneMatch[1].replace(/\\s+/g, '').trim() : null;\n\nconst nameMatch = html.match(/(?:contact(?:\\s+name)?|account\\s+manager|fn)[\\s\\S]{0,100}?<[^>]+>\\s*([A-Z][a-z]+ [A-Z][a-z]+)/i);\nconst contactName = nameMatch ? nameMatch[1].trim() : null;\n\nconst websiteMatch = html.match(/(?:website|primary\\s*url|promotional\\s*url)[\\s\\S]{0,200}?href=[\"'](https?:\\/\\/[^\"']+)[\"']/i);\nconst website = websiteMatch ? websiteMatch[1].trim() : null;\n\nconst contactHidden = /contact.*hidden|privacy.*setting|not\\s+publicly/i.test(html);\n\nconst weekStart = $('Generate Last Week Date Range').item.json.week_start;\n\nreturn [{\n  json: {\n    ...$json,\n    scraped_email:        email,\n    scraped_phone:        phone,\n    scraped_contact_name: contactName,\n    scraped_website:      website,\n    contact_hidden:       contactHidden,\n    profile_scraped:      true,\n    join_date:            weekStart,\n    detected_as:          'new_this_week'\n  }\n}];"
+      },
+      "id": "w4c",
+      "name": "Parse New Publisher Profile HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1960, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond_email",
+              "leftValue": "={{ $json.scraped_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w4d",
+      "name": "IF: New Publisher Has Email from Profile?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2160, 240]
+    },
+    {
+      "parameters": {
+        "content": "TRUE → skip Hunter, build record.\nFALSE → extract domain, try Hunter.",
+        "height": 90,
+        "width": 280,
+        "color": 6
+      },
+      "id": "sticky_w4d",
+      "name": "Sticky — IF W4D",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2140, 380]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const raw = $json.scraped_website || $json.primaryUrl || $json.displayUrl || '';\n\nconst domain = raw\n  .replace(/https?:\\/\\//i, '')\n  .replace(/^www\\./i, '')\n  .split('/')[0]\n  .split('?')[0]\n  .trim()\n  .toLowerCase();\n\nconst isValid = domain.length > 3 && domain.includes('.');\n\nreturn [{ json: { ...$json, domain: isValid ? domain : null, domain_valid: isValid } }];"
+      },
+      "id": "w4e",
+      "name": "Extract Domain for New Publisher",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2360, 360]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond_dv",
+              "leftValue": "={{ $json.domain_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w4f",
+      "name": "IF: Valid Domain for Hunter — New Publisher?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2560, 360]
+    },
+    {
+      "parameters": {
+        "content": "TRUE → Hunter enrichment.\nFALSE → build record with empty email.",
+        "height": 90,
+        "width": 280,
+        "color": 6
+      },
+      "id": "sticky_w4f",
+      "name": "Sticky — IF W4F",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2540, 500]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "w4_pre_hunter",
+      "name": "Wait 5s — Pre Hunter (New)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2760, 360],
+      "webhookId": "wait-w4-pre-hunter"
+    },
+    {
+      "parameters": {
+        "content": "Wait 5000 ms — Hunter pre-call buffer.",
+        "height": 80,
+        "width": 220,
+        "color": 6
+      },
+      "id": "sticky_w4_pre_hunter",
+      "name": "Sticky — Pre Hunter Wait",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2740, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.hunter.io/v2/domain-search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $json.domain }}"
+            },
+            {
+              "name": "limit",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "w4g",
+      "name": "Hunter.io — Enrich New Publisher",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2960, 360],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "REPLACE_HUNTER_API_KEY_ID",
+          "name": "HUNTER_API_KEY"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "w4g_wait",
+      "name": "Wait 2s — Post Hunter (New)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3160, 360],
+      "webhookId": "wait-w4g"
+    },
+    {
+      "parameters": {
+        "content": "Wait 2000 ms — post-Hunter spacing.",
+        "height": 80,
+        "width": 220,
+        "color": 6
+      },
+      "id": "sticky_w4g_wait",
+      "name": "Sticky — Post Hunter Wait",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3140, 480]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const data = $json.data || {};\nconst emails = data.emails || [];\n\nconst best = emails\n  .filter(e => (e.confidence || 0) >= 70)\n  .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0] || emails[0] || {};\n\nreturn [{\n  json: {\n    ...$json,\n    hunter_email:       best.value || null,\n    hunter_first_name:  best.first_name || null,\n    hunter_last_name:   best.last_name || null,\n    hunter_confidence:  best.confidence || null,\n    hunter_email_type:  best.type || null,\n    hunter_org:         data.organization || null,\n    hunter_phone:       data.phone_number || null\n  }\n}];"
+      },
+      "id": "w4g_extract",
+      "name": "Extract Best Hunter Email — New",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3360, 360]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.hunterCallsThisMonth = (staticData.hunterCallsThisMonth || 0) + 1;\nreturn [{ json: { ...$json, hunter_total_calls: staticData.hunterCallsThisMonth } }];"
+      },
+      "id": "w4g_counter",
+      "name": "Increment Hunter Counter — New",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3560, 360]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const d = $json;\n\nconst email = d.scraped_email || d.hunter_email || '';\nconst emailSource = d.scraped_email ? 'AWIN Profile'\n                  : d.hunter_email  ? 'Hunter.io'\n                  : 'Not Found';\n\nconst contactName = d.scraped_contact_name\n  || [d.hunter_first_name, d.hunter_last_name].filter(Boolean).join(' ')\n  || '';\n\nconst phone = d.scraped_phone || d.hunter_phone || '';\nconst weekStart = $('Generate Last Week Date Range').item.json.week_start;\n\nreturn [{\n  json: {\n    publisher_id:      d.id,\n    publisher_name:    d.name || d.publisherName || '',\n    contact_name:      contactName,\n    email:             email,\n    email_source:      emailSource,\n    email_confidence:  d.hunter_confidence || '',\n    phone:             phone,\n    website:           d.scraped_website || d.domain || '',\n    domain:            d.domain || '',\n    promo_type:        d.primaryType || '',\n    region:            d.primaryRegion || '',\n    join_date:         weekStart,\n    clicks_week:       0,\n    transactions_week: 0,\n    commission_week:   0,\n    clicks:            0,\n    impressions:       0,\n    transactions:      0,\n    commission:        0,\n    status:            'active',\n    date_detected:     new Date().toISOString().split('T')[0],\n    date_scraped:      new Date().toISOString().split('T')[0],\n    detected_as:       'new_this_week'\n  }\n}];"
+      },
+      "id": "w4h",
+      "name": "Build New Publisher Enriched Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3760, 240]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "New Publishers This Week",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "contact_name": "={{ $json.contact_name }}",
+            "email": "={{ $json.email }}",
+            "email_source": "={{ $json.email_source }}",
+            "phone": "={{ $json.phone }}",
+            "website": "={{ $json.website }}",
+            "promo_type": "={{ $json.promo_type }}",
+            "region": "={{ $json.region }}",
+            "join_date": "={{ $json.join_date }}",
+            "clicks_week": "={{ $json.clicks_week }}",
+            "transactions_week": "={{ $json.transactions_week }}",
+            "commission_week": "={{ $json.commission_week }}",
+            "date_detected": "={{ $json.date_detected }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "w4i",
+      "name": "Save to New Publishers This Week Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3960, 240],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Publishers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "contact_name": "={{ $json.contact_name }}",
+            "email": "={{ $json.email }}",
+            "email_source": "={{ $json.email_source }}",
+            "email_confidence": "={{ $json.email_confidence }}",
+            "phone": "={{ $json.phone }}",
+            "website": "={{ $json.website }}",
+            "domain": "={{ $json.domain }}",
+            "promo_type": "={{ $json.promo_type }}",
+            "region": "={{ $json.region }}",
+            "clicks": "={{ $json.clicks }}",
+            "impressions": "={{ $json.impressions }}",
+            "transactions": "={{ $json.transactions }}",
+            "commission": "={{ $json.commission }}",
+            "status": "={{ $json.status }}",
+            "date_scraped": "={{ $json.date_scraped }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "w4j",
+      "name": "Save New Publisher to Master Publishers Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [4160, 240],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "Always keep Master tab as full source of truth — also writes here in addition to New Publishers tab.",
+        "height": 90,
+        "width": 280,
+        "color": 6
+      },
+      "id": "sticky_w4j",
+      "name": "Sticky — Master Tab Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [4140, 380]
+    },
+    {
+      "parameters": {
+        "content": "### Section W5 — Weekly sales fetch\nBranch B runs in parallel from W2.",
+        "height": 200,
+        "width": 760,
+        "color": 5
+      },
+      "id": "sticky_w5",
+      "name": "Sticky — Section W5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 700]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.awin.com/advertisers/{{ $vars.AWIN_ADVERTISER_ID }}/reports/publisher",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "startDate",
+              "value": "={{ $('Generate Last Week Date Range').item.json.week_start }}"
+            },
+            {
+              "name": "endDate",
+              "value": "={{ $('Generate Last Week Date Range').item.json.week_end }}"
+            },
+            {
+              "name": "dateType",
+              "value": "transaction"
+            },
+            {
+              "name": "timezone",
+              "value": "UTC"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "w5a",
+      "name": "AWIN — Get Weekly Publisher Sales Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [320, 880],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AWIN_API_TOKEN_ID",
+          "name": "AWIN_API_TOKEN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "w5a_wait",
+      "name": "Wait 3s — After Weekly Sales",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [520, 880],
+      "webhookId": "wait-w5a"
+    },
+    {
+      "parameters": {
+        "content": "Wait 3000 ms — AWIN 20 req/min hard limit.",
+        "height": 80,
+        "width": 220,
+        "color": 6
+      },
+      "id": "sticky_w5a_wait",
+      "name": "Sticky — Wait W5A",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [500, 1000]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const weekData = $input.all();\nconst week_start = $('Generate Last Week Date Range').item.json.week_start;\nconst week_end   = $('Generate Last Week Date Range').item.json.week_end;\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.zeroActivityCount  = 0;\nstaticData.lowPerformersCount = 0;\n\nreturn weekData.flatMap(p => {\n  const rows = Array.isArray(p.json) ? p.json : [p.json];\n  return rows.map(d => {\n    const clicks      = d.clicks || 0;\n    const hasActivity = clicks > 0 || (d.totalNo || 0) > 0;\n\n    if (!hasActivity) staticData.zeroActivityCount++;\n    if (clicks < ($vars.LOW_CLICK_THRESHOLD || 100)) staticData.lowPerformersCount++;\n\n    return {\n      json: {\n        week_start,\n        week_end,\n        publisher_id:         d.publisherId,\n        publisher_name:       d.publisherName,\n        clicks,\n        impressions:          d.impressions || 0,\n        transactions:         d.totalNo || 0,\n        confirmed_sales:      d.confirmedNo || 0,\n        confirmed_value:      d.confirmedValue || 0,\n        confirmed_commission: d.confirmedComm || 0,\n        pending_sales:        d.pendingNo || 0,\n        pending_value:        d.pendingValue || 0,\n        declined_sales:       d.declinedNo || 0,\n        total_commission:     d.totalComm || 0,\n        has_activity:         hasActivity,\n        date_recorded:        new Date().toISOString().split('T')[0]\n      }\n    };\n  });\n});"
+      },
+      "id": "w5b",
+      "name": "Build Weekly Sales Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 880]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Weekly Sales",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "week_start": "={{ $json.week_start }}",
+            "week_end": "={{ $json.week_end }}",
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "clicks": "={{ $json.clicks }}",
+            "impressions": "={{ $json.impressions }}",
+            "transactions": "={{ $json.transactions }}",
+            "confirmed_sales": "={{ $json.confirmed_sales }}",
+            "confirmed_value": "={{ $json.confirmed_value }}",
+            "confirmed_commission": "={{ $json.confirmed_commission }}",
+            "pending_sales": "={{ $json.pending_sales }}",
+            "pending_value": "={{ $json.pending_value }}",
+            "declined_sales": "={{ $json.declined_sales }}",
+            "total_commission": "={{ $json.total_commission }}",
+            "date_recorded": "={{ $json.date_recorded }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "w5c",
+      "name": "Save Weekly Sales Report to Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [920, 880],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "### Section W6 — Zero activity detection (Branch C)\nFlag publishers with ≥ ZERO_ACTIVITY_THRESHOLD consecutive zero-activity weeks.",
+        "height": 220,
+        "width": 1180,
+        "color": 5
+      },
+      "id": "sticky_w6",
+      "name": "Sticky — Section W6",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1140, 700]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const allWeekData = $('Build Weekly Sales Records').all();\nconst zeroActivity = allWeekData\n  .filter(p => p.json && p.json.has_activity === false);\nreturn zeroActivity.map(p => ({ json: p.json }));"
+      },
+      "id": "w6a",
+      "name": "Filter Publishers With Zero Activity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1240, 880]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Zero Activity Alert",
+          "mode": "name"
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      },
+      "id": "w6b",
+      "name": "Read Existing Zero Activity Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1440, 880],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const zeroThisWeek = $('Filter Publishers With Zero Activity').all()\n  .map(p => ({ id: String(p.json.publisher_id), name: p.json.publisher_name }));\n\nconst existingLog = $('Read Existing Zero Activity Log').all()\n  .reduce((acc, r) => {\n    const id = String(r.json.publisher_id || '');\n    const wk = parseInt(r.json.weeks_inactive) || 0;\n    if (id) acc[id] = Math.max(acc[id] || 0, wk);\n    return acc;\n  }, {});\n\nconst THRESHOLD = $vars.ZERO_ACTIVITY_THRESHOLD || 2;\n\nreturn zeroThisWeek.map(p => {\n  const weeksInactive = (existingLog[p.id] || 0) + 1;\n  return {\n    json: {\n      publisher_id:    p.id,\n      publisher_name:  p.name,\n      weeks_inactive:  weeksInactive,\n      flag_for_review: weeksInactive >= THRESHOLD,\n      date_flagged:    new Date().toISOString().split('T')[0]\n    }\n  };\n});"
+      },
+      "id": "w6c",
+      "name": "Calculate Weeks Inactive Per Publisher",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1640, 880]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond_flag",
+              "leftValue": "={{ $json.flag_for_review }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w6d",
+      "name": "IF: Publisher Inactive Long Enough to Flag?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1840, 880]
+    },
+    {
+      "parameters": {
+        "content": "TRUE → log to Zero Activity Alert.\nFALSE → drop.",
+        "height": 90,
+        "width": 240,
+        "color": 6
+      },
+      "id": "sticky_w6d",
+      "name": "Sticky — IF W6D",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1820, 1020]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Zero Activity Alert",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "email": "",
+            "last_active_date": "",
+            "weeks_inactive": "={{ $json.weeks_inactive }}",
+            "promo_type": "",
+            "date_flagged": "={{ $json.date_flagged }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "w6e",
+      "name": "Log Zero Activity Publisher",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2040, 880],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "### Section W7 — Low performance email alert (Branch D)\nClicks < LOW_CLICK_THRESHOLD ⇒ personalized Gmail. Once per publisher per week.",
+        "height": 240,
+        "width": 2700,
+        "color": 5
+      },
+      "id": "sticky_w7",
+      "name": "Sticky — Section W7",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 1240]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const weeklyData = $('Build Weekly Sales Records').all();\nconst THRESHOLD = $vars.LOW_CLICK_THRESHOLD || 100;\n\nconst lowPerformers = weeklyData.filter(p => {\n  const clicks = p.json.clicks || 0;\n  const isNewThisWeek = p.json.detected_as === 'new_this_week';\n  return !isNewThisWeek && clicks < THRESHOLD;\n});\n\nreturn lowPerformers.map(p => ({ json: p.json }));"
+      },
+      "id": "w7a",
+      "name": "Filter Publishers Below 100 Clicks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [340, 1420]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Publishers",
+          "mode": "name"
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      },
+      "id": "w7b",
+      "name": "Read Publisher Emails from Master Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [540, 1420],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const contacts = $('Read Publisher Emails from Master Tab').all()\n  .reduce((acc, r) => {\n    acc[String(r.json.publisher_id)] = {\n      email:        r.json.email || null,\n      contact_name: r.json.contact_name || null\n    };\n    return acc;\n  }, {});\n\nconst d = $json;\nconst match = contacts[String(d.publisher_id)] || {};\n\nreturn [{\n  json: {\n    ...d,\n    contact_email: match.email || null,\n    contact_name:  match.contact_name || 'Affiliate Partner',\n    has_email:     !!match.email\n  }\n}];"
+      },
+      "id": "w7c",
+      "name": "Match Low Performer to Contact Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, 1420]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond_has_email",
+              "leftValue": "={{ $json.has_email }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w7d",
+      "name": "IF: Low Performer Has Contact Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [940, 1420]
+    },
+    {
+      "parameters": {
+        "content": "TRUE → dedup + send.\nFALSE → log row with email_sent=false.",
+        "height": 90,
+        "width": 280,
+        "color": 6
+      },
+      "id": "sticky_w7d",
+      "name": "Sticky — IF W7D",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [920, 1560]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Low Performance Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "email": "NOT FOUND",
+            "clicks_this_week": "={{ $json.clicks }}",
+            "transactions_this_week": "={{ $json.transactions }}",
+            "commission_this_week": "={{ $json.total_commission }}",
+            "email_sent": false,
+            "email_sent_at": "",
+            "week_start": "={{ $json.week_start }}",
+            "week_end": "={{ $json.week_end }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "w7d_log_no_email",
+      "name": "Log Low Performer — No Email on File",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1140, 1600],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Low Performance Log",
+          "mode": "name"
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      },
+      "id": "w7e",
+      "name": "Read Low Performance Log for Dedup Check",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1140, 1420],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const log = $('Read Low Performance Log for Dedup Check').all();\nconst thisWeekStart   = $json.week_start;\nconst thisPublisherId = String($json.publisher_id);\n\nconst alreadySent = log.some(r =>\n  String(r.json.publisher_id) === thisPublisherId &&\n  r.json.week_start === thisWeekStart &&\n  (r.json.email_sent === true || r.json.email_sent === 'TRUE' || r.json.email_sent === 'true')\n);\n\nreturn [{ json: { ...$json, already_emailed: alreadySent } }];"
+      },
+      "id": "w7f",
+      "name": "Check: Already Emailed This Publisher This Week?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 1420]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond_already",
+              "leftValue": "={{ $json.already_emailed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w7g",
+      "name": "IF: Email Already Sent This Week?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1540, 1420]
+    },
+    {
+      "parameters": {
+        "content": "TRUE → skip (no duplicate send).\nFALSE → build & send.",
+        "height": 90,
+        "width": 240,
+        "color": 6
+      },
+      "id": "sticky_w7g",
+      "name": "Sticky — IF W7G",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1520, 1560]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const d = $json;\nconst firstName = (d.contact_name || 'Affiliate Partner').split(' ')[0];\nconst clicks       = d.clicks || 0;\nconst transactions = d.transactions || 0;\nconst commission   = parseFloat(d.total_commission || 0).toFixed(2);\nconst weekStart    = d.week_start;\nconst weekEnd      = d.week_end;\n\nconst subject = `Your Green Roads affiliate performance update — week of ${weekStart}`;\n\nconst body = [\n  `Hi ${firstName},`,\n  '',\n  'Thank you for being a Green Roads affiliate partner. We truly value',\n  'your continued support in promoting our products.',\n  '',\n  `We noticed your account generated ${clicks} click${clicks !== 1 ? 's' : ''} during the week of`,\n  `${weekStart} to ${weekEnd}, which is below our typical partner benchmark of 100 clicks per week.`,\n  '',\n  'Here is your performance summary for that week:',\n  '',\n  `  Clicks:       ${clicks}`,\n  `  Transactions: ${transactions}`,\n  `  Commission:   $${commission}`,\n  '',\n  'We want to help you grow. Here are a few resources that consistently',\n  'help our top partners improve their results:',\n  '',\n  '  1. Fresh creatives',\n  '     New banners, product images, and ad copy are available in your',\n  '     AWIN dashboard under the Creatives tab. Updated visuals improve',\n  '     click-through rates significantly.',\n  '',\n  '  2. Active promotions and discount codes',\n  '     Check the Offers tab in AWIN for our latest deals. Sharing',\n  '     exclusive codes with your audience drives urgency and conversions.',\n  '',\n  '  3. Top converting products right now',\n  '     Our CBD oils, gummies, and topicals are performing strongly.',\n  '     Reply to this email if you would like dedicated product links',\n  '     or a custom landing page for your audience.',\n  '',\n  '  4. Content support',\n  '     If you create blog, social, or newsletter content, we can',\n  '     provide product briefs, talking points, and SEO-friendly copy',\n  '     tailored to your audience — just ask.',\n  '',\n  'If you have any questions or need anything at all, simply reply to',\n  'this email. Our affiliate team responds within one business day.',\n  '',\n  'We are here to help you succeed.',\n  '',\n  'Warm regards,',\n  'Green Roads Affiliate Team',\n  'affiliates@greenroads.com',\n  'https://www.greenroads.com'\n].join('\\n');\n\nreturn [{\n  json: {\n    ...d,\n    email_subject: subject,\n    email_body:    body,\n    recipient:     d.contact_email\n  }\n}];"
+      },
+      "id": "w7h",
+      "name": "Build Low Performance Email Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1740, 1420]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "w7h_pre_wait",
+      "name": "Wait 2s — Pre Gmail Send",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1940, 1420],
+      "webhookId": "wait-w7h"
+    },
+    {
+      "parameters": {
+        "content": "Wait 2000 ms — Gmail free 500/day · Workspace 2000/day. >200 publishers ⇒ swap to SendGrid/Mailgun.",
+        "height": 100,
+        "width": 280,
+        "color": 6
+      },
+      "id": "sticky_w7h_pre",
+      "name": "Sticky — Pre Gmail Wait",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1920, 1560]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipient }}",
+        "subject": "={{ $json.email_subject }}",
+        "emailType": "text",
+        "message": "={{ $json.email_body }}",
+        "options": {
+          "senderName": "Green Roads Affiliate Team",
+          "appendAttribution": false
+        }
+      },
+      "id": "w7i",
+      "name": "Gmail — Send Low Performance Alert Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2140, 1420],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_OAUTH_ID",
+          "name": "GMAIL_OAUTH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "w7i_post_wait",
+      "name": "Wait 2s — Post Gmail Send",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2340, 1420],
+      "webhookId": "wait-w7i"
+    },
+    {
+      "parameters": {
+        "content": "Wait 2000 ms — stay within Gmail daily limits.",
+        "height": 80,
+        "width": 240,
+        "color": 6
+      },
+      "id": "sticky_w7i_post",
+      "name": "Sticky — Post Gmail Wait",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2320, 1560]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Low Performance Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "email": "={{ $json.recipient }}",
+            "clicks_this_week": "={{ $json.clicks }}",
+            "transactions_this_week": "={{ $json.transactions }}",
+            "commission_this_week": "={{ $json.total_commission }}",
+            "email_sent": true,
+            "email_sent_at": "={{ $now.toISO() }}",
+            "week_start": "={{ $json.week_start }}",
+            "week_end": "={{ $json.week_end }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "w7j",
+      "name": "Log Low Performance Email — Success",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2540, 1420],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "### Rate-limit error handler (utility — wire from any HTTP node's error output)",
+        "height": 380,
+        "width": 760,
+        "color": 5
+      },
+      "id": "sticky_err",
+      "name": "Sticky — Rate Limit Handler",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-400, 1900]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst attempt = staticData.retryAttempt || 1;\nconst baseDelay = 3000;\nconst maxDelay = 60000;\nconst jitter = Math.random() * 1000;\nconst delay = Math.min(baseDelay * Math.pow(2, attempt - 1) + jitter, maxDelay);\nstaticData.retryAttempt = attempt + 1;\nreturn [{ json: { ...$json, delay_ms: Math.round(delay), attempt } }];"
+      },
+      "id": "err_a",
+      "name": "Calculate Exponential Backoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-320, 2040]
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.round(($json.delay_ms || 3000) / 1000) }}",
+        "unit": "seconds"
+      },
+      "id": "err_b",
+      "name": "Wait — Exponential Backoff",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-100, 2040],
+      "webhookId": "wait-exp-backoff-w2"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Rate Limit Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "node_name": "={{ $execution.lastNodeExecuted || '' }}",
+            "domain": "={{ $json.domain || '' }}",
+            "error_code": 429,
+            "retry_count": "={{ $json.attempt || 1 }}",
+            "resolution": "retrying"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "err_c",
+      "name": "Log Rate Limit Error",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [120, 2040],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Weekly Trigger — Every Monday 08:00 AM UTC": {
+      "main": [[{ "node": "Generate Last Week Date Range", "type": "main", "index": 0 }]]
+    },
+    "Manual Trigger — Test Weekly Run": {
+      "main": [[{ "node": "Generate Last Week Date Range", "type": "main", "index": 0 }]]
+    },
+    "Generate Last Week Date Range": {
+      "main": [[
+        { "node": "AWIN — Get All Current Publishers", "type": "main", "index": 0 },
+        { "node": "AWIN — Get Weekly Publisher Sales Report", "type": "main", "index": 0 }
+      ]]
+    },
+    "AWIN — Get All Current Publishers": {
+      "main": [[{ "node": "Wait 3s — After AWIN Current Publishers", "type": "main", "index": 0 }]]
+    },
+    "Wait 3s — After AWIN Current Publishers": {
+      "main": [[{ "node": "Read Known Publisher IDs from Master Tab", "type": "main", "index": 0 }]]
+    },
+    "Read Known Publisher IDs from Master Tab": {
+      "main": [[{ "node": "Detect New Publishers This Week", "type": "main", "index": 0 }]]
+    },
+    "Detect New Publishers This Week": {
+      "main": [[{ "node": "IF: Any New Publishers This Week?", "type": "main", "index": 0 }]]
+    },
+    "IF: Any New Publishers This Week?": {
+      "main": [
+        [{ "node": "Batch — One New Publisher at a Time", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Batch — One New Publisher at a Time": {
+      "main": [
+        [],
+        [{ "node": "AWIN UI — Scrape New Publisher Profile", "type": "main", "index": 0 }]
+      ]
+    },
+    "AWIN UI — Scrape New Publisher Profile": {
+      "main": [[{ "node": "Wait 4s — After New Profile Scrape", "type": "main", "index": 0 }]]
+    },
+    "Wait 4s — After New Profile Scrape": {
+      "main": [[{ "node": "Parse New Publisher Profile HTML", "type": "main", "index": 0 }]]
+    },
+    "Parse New Publisher Profile HTML": {
+      "main": [[{ "node": "IF: New Publisher Has Email from Profile?", "type": "main", "index": 0 }]]
+    },
+    "IF: New Publisher Has Email from Profile?": {
+      "main": [
+        [{ "node": "Build New Publisher Enriched Record", "type": "main", "index": 0 }],
+        [{ "node": "Extract Domain for New Publisher", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Domain for New Publisher": {
+      "main": [[{ "node": "IF: Valid Domain for Hunter — New Publisher?", "type": "main", "index": 0 }]]
+    },
+    "IF: Valid Domain for Hunter — New Publisher?": {
+      "main": [
+        [{ "node": "Wait 5s — Pre Hunter (New)", "type": "main", "index": 0 }],
+        [{ "node": "Build New Publisher Enriched Record", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait 5s — Pre Hunter (New)": {
+      "main": [[{ "node": "Hunter.io — Enrich New Publisher", "type": "main", "index": 0 }]]
+    },
+    "Hunter.io — Enrich New Publisher": {
+      "main": [[{ "node": "Wait 2s — Post Hunter (New)", "type": "main", "index": 0 }]]
+    },
+    "Wait 2s — Post Hunter (New)": {
+      "main": [[{ "node": "Extract Best Hunter Email — New", "type": "main", "index": 0 }]]
+    },
+    "Extract Best Hunter Email — New": {
+      "main": [[{ "node": "Increment Hunter Counter — New", "type": "main", "index": 0 }]]
+    },
+    "Increment Hunter Counter — New": {
+      "main": [[{ "node": "Build New Publisher Enriched Record", "type": "main", "index": 0 }]]
+    },
+    "Build New Publisher Enriched Record": {
+      "main": [[{ "node": "Save to New Publishers This Week Tab", "type": "main", "index": 0 }]]
+    },
+    "Save to New Publishers This Week Tab": {
+      "main": [[{ "node": "Save New Publisher to Master Publishers Tab", "type": "main", "index": 0 }]]
+    },
+    "Save New Publisher to Master Publishers Tab": {
+      "main": [[{ "node": "Batch — One New Publisher at a Time", "type": "main", "index": 0 }]]
+    },
+    "AWIN — Get Weekly Publisher Sales Report": {
+      "main": [[{ "node": "Wait 3s — After Weekly Sales", "type": "main", "index": 0 }]]
+    },
+    "Wait 3s — After Weekly Sales": {
+      "main": [[{ "node": "Build Weekly Sales Records", "type": "main", "index": 0 }]]
+    },
+    "Build Weekly Sales Records": {
+      "main": [[
+        { "node": "Save Weekly Sales Report to Tab", "type": "main", "index": 0 },
+        { "node": "Filter Publishers With Zero Activity", "type": "main", "index": 0 },
+        { "node": "Filter Publishers Below 100 Clicks", "type": "main", "index": 0 }
+      ]]
+    },
+    "Filter Publishers With Zero Activity": {
+      "main": [[{ "node": "Read Existing Zero Activity Log", "type": "main", "index": 0 }]]
+    },
+    "Read Existing Zero Activity Log": {
+      "main": [[{ "node": "Calculate Weeks Inactive Per Publisher", "type": "main", "index": 0 }]]
+    },
+    "Calculate Weeks Inactive Per Publisher": {
+      "main": [[{ "node": "IF: Publisher Inactive Long Enough to Flag?", "type": "main", "index": 0 }]]
+    },
+    "IF: Publisher Inactive Long Enough to Flag?": {
+      "main": [
+        [{ "node": "Log Zero Activity Publisher", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Filter Publishers Below 100 Clicks": {
+      "main": [[{ "node": "Read Publisher Emails from Master Tab", "type": "main", "index": 0 }]]
+    },
+    "Read Publisher Emails from Master Tab": {
+      "main": [[{ "node": "Match Low Performer to Contact Email", "type": "main", "index": 0 }]]
+    },
+    "Match Low Performer to Contact Email": {
+      "main": [[{ "node": "IF: Low Performer Has Contact Email?", "type": "main", "index": 0 }]]
+    },
+    "IF: Low Performer Has Contact Email?": {
+      "main": [
+        [{ "node": "Read Low Performance Log for Dedup Check", "type": "main", "index": 0 }],
+        [{ "node": "Log Low Performer — No Email on File", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Low Performance Log for Dedup Check": {
+      "main": [[{ "node": "Check: Already Emailed This Publisher This Week?", "type": "main", "index": 0 }]]
+    },
+    "Check: Already Emailed This Publisher This Week?": {
+      "main": [[{ "node": "IF: Email Already Sent This Week?", "type": "main", "index": 0 }]]
+    },
+    "IF: Email Already Sent This Week?": {
+      "main": [
+        [],
+        [{ "node": "Build Low Performance Email Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Low Performance Email Content": {
+      "main": [[{ "node": "Wait 2s — Pre Gmail Send", "type": "main", "index": 0 }]]
+    },
+    "Wait 2s — Pre Gmail Send": {
+      "main": [[{ "node": "Gmail — Send Low Performance Alert Email", "type": "main", "index": 0 }]]
+    },
+    "Gmail — Send Low Performance Alert Email": {
+      "main": [[{ "node": "Wait 2s — Post Gmail Send", "type": "main", "index": 0 }]]
+    },
+    "Wait 2s — Post Gmail Send": {
+      "main": [[{ "node": "Log Low Performance Email — Success", "type": "main", "index": 0 }]]
+    },
+    "Calculate Exponential Backoff": {
+      "main": [[{ "node": "Wait — Exponential Backoff", "type": "main", "index": 0 }]]
+    },
+    "Wait — Exponential Backoff": {
+      "main": [[{ "node": "Log Rate Limit Error", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "timezone": "UTC"
+  },
+  "staticData": null,
+  "pinData": {},
+  "tags": [
+    { "name": "green-roads" },
+    { "name": "awin" },
+    { "name": "weekly" }
+  ],
+  "active": false,
+  "versionId": "",
+  "id": "",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

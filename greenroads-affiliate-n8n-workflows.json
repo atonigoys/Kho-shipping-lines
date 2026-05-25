@@ -1,0 +1,928 @@
+﻿[
+    {
+        "name":  "Greenroads 01 - Daily AWIN Performance Monitor",
+        "settings":  {
+                         "executionOrder":  "v1",
+                         "timezone":  "Asia/Manila",
+                         "saveDataSuccessExecution":  "none",
+                         "saveDataErrorExecution":  "all",
+                         "executionTimeout":  1800
+                     },
+        "nodes":  [
+                      {
+                          "id":  "sched-awin-daily",
+                          "name":  "Daily 07:00",
+                          "type":  "n8n-nodes-base.scheduleTrigger",
+                          "typeVersion":  1.3,
+                          "position":  [
+                                           0,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "rule":  {
+                                                          "interval":  [
+                                                                           {
+                                                                               "field":  "cronExpression",
+                                                                               "expression":  "0 7 * * *"
+                                                                           }
+                                                                       ]
+                                                      }
+                                         }
+                      },
+                      {
+                          "id":  "awin-stats",
+                          "name":  "AWIN - Fetch Publisher Stats",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           260,
+                                           0
+                                       ],
+                          "retryOnFail":  true,
+                          "maxTries":  3,
+                          "waitBetweenTries":  5000,
+                          "parameters":  {
+                                             "method":  "GET",
+                                             "url":  "={{\u0027https://api.awin.com/advertisers/\u0027 + $vars.AWIN_ADVERTISER_ID + \u0027/publishers/performance\u0027}}",
+                                             "sendQuery":  true,
+                                             "queryParameters":  {
+                                                                     "parameters":  [
+                                                                                        {
+                                                                                            "name":  "startDate",
+                                                                                            "value":  "={{$now.minus({days: 30}).toFormat(\u0027yyyy-MM-dd\u0027)}}"
+                                                                                        },
+                                                                                        {
+                                                                                            "name":  "endDate",
+                                                                                            "value":  "={{$now.minus({days: 1}).toFormat(\u0027yyyy-MM-dd\u0027)}}"
+                                                                                        },
+                                                                                        {
+                                                                                            "name":  "timezone",
+                                                                                            "value":  "UTC"
+                                                                                        }
+                                                                                    ]
+                                                                 },
+                                             "sendHeaders":  true,
+                                             "headerParameters":  {
+                                                                      "parameters":  [
+                                                                                         {
+                                                                                             "name":  "Authorization",
+                                                                                             "value":  "={{\u0027Bearer \u0027 + $vars.AWIN_API_TOKEN}}"
+                                                                                         },
+                                                                                         {
+                                                                                             "name":  "Accept",
+                                                                                             "value":  "application/json"
+                                                                                         }
+                                                                                     ]
+                                                                  },
+                                             "options":  {
+                                                             "timeout":  120000,
+                                                             "response":  {
+                                                                              "response":  {
+                                                                                               "neverError":  true
+                                                                                           }
+                                                                          }
+                                                         }
+                                         }
+                      },
+                      {
+                          "id":  "classify-affiliates",
+                          "name":  "Classify Affiliates",
+                          "type":  "n8n-nodes-base.code",
+                          "typeVersion":  2,
+                          "position":  [
+                                           520,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "mode":  "runOnceForAllItems",
+                                             "language":  "javaScript",
+                                             "jsCode":  "const input = $input.first().json;\nconst rows = Array.isArray(input) ? input : (input.data || input.results || input.publishers || []);\nconst relevant = [\u0027cbd\u0027,\u0027wellness\u0027,\u0027fitness\u0027,\u0027supplement\u0027,\u0027recovery\u0027,\u0027health\u0027,\u0027lifestyle\u0027,\u0027coupon\u0027,\u0027deal\u0027,\u0027review\u0027];\nconst now = new Date().toISOString();\nconst lowClickThreshold = Number($vars.LOW_PERFORMER_CLICKS || 150);\nconst topSalesThreshold = Number($vars.TOP_PERFORMER_SALES || 10);\nconst strongCr = Number($vars.TOP_PERFORMER_CR || 0.03);\nconst lowCr = Number($vars.LOW_PERFORMER_CR || 0.005);\nconst affiliates = rows.map(r =\u003e {\n  const clicks = Number(r.clicks || r.totalClicks || r.clickCount || 0);\n  const sales = Number(r.sales || r.transactions || r.saleCount || 0);\n  const cr = Number(r.conversionRate || r.cr || (clicks ? sales / clicks : 0));\n  const category = String(r.category || r.vertical || \u0027\u0027).toLowerCase();\n  const country = r.country || r.countryCode || \u0027\u0027;\n  const name = r.affiliateName || r.publisherName || r.name || \u0027\u0027;\n  const website = r.websiteUrl || r.website || r.url || \u0027\u0027;\n  let classification = \u0027MONITOR\u0027;\n  if (clicks \u003e= lowClickThreshold \u0026\u0026 sales === 0 \u0026\u0026 cr \u003c= lowCr) classification = \u0027LOW_PERFORMER\u0027;\n  if (sales \u003e= topSalesThreshold \u0026\u0026 cr \u003e= strongCr) classification = \u0027TOP_PERFORMER\u0027;\n  const isRelevant = relevant.some(k =\u003e `${category} ${name} ${website}`.toLowerCase().includes(k));\n  if (classification === \u0027MONITOR\u0027 \u0026\u0026 isRelevant) classification = \u0027OUTREACH_CANDIDATE\u0027;\n  return { affiliate_id: r.affiliateId || r.publisherId || r.id || \u0027\u0027, affiliate_name: name, clicks, sales, conversion_rate: cr, website_url: website, category, country, classification, source: \u0027AWIN\u0027, last_seen_at: now };\n});\nconst values = affiliates.map(a =\u003e [a.affiliate_id, a.affiliate_name, a.clicks, a.sales, a.conversion_rate, a.website_url, a.category, a.country, a.classification, a.source, a.last_seen_at]);\nreturn [{ json: { count: affiliates.length, affiliates, sheetsPayload: { valueInputOption: \u0027USER_ENTERED\u0027, data: [{ range: \u0027affiliates!A2:K\u0027, majorDimension: \u0027ROWS\u0027, values }] } } }];"
+                                         }
+                      },
+                      {
+                          "id":  "sheets-affiliates",
+                          "name":  "Sheets - Upsert Affiliates Staging",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           780,
+                                           0
+                                       ],
+                          "retryOnFail":  true,
+                          "maxTries":  3,
+                          "waitBetweenTries":  5000,
+                          "parameters":  {
+                                             "method":  "POST",
+                                             "url":  "={{\u0027https://sheets.googleapis.com/v4/spreadsheets/\u0027 + $vars.GOOGLE_SHEET_ID + \u0027/values:batchUpdate\u0027}}",
+                                             "authentication":  "predefinedCredentialType",
+                                             "nodeCredentialType":  "googleApi",
+                                             "sendBody":  true,
+                                             "contentType":  "json",
+                                             "jsonBody":  "={{$json.sheetsPayload}}",
+                                             "options":  {
+                                                             "timeout":  120000
+                                                         }
+                                         }
+                      }
+                  ],
+        "connections":  {
+                            "Daily 07:00":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "AWIN - Fetch Publisher Stats",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                            "AWIN - Fetch Publisher Stats":  {
+                                                                 "main":  [
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "Classify Affiliates",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ]
+                                                                          ]
+                                                             },
+                            "Classify Affiliates":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "Sheets - Upsert Affiliates Staging",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    }
+                        }
+    },
+    {
+        "name":  "Greenroads 02 - New Affiliate Discovery",
+        "settings":  {
+                         "executionOrder":  "v1",
+                         "timezone":  "Asia/Manila",
+                         "saveDataSuccessExecution":  "none",
+                         "saveDataErrorExecution":  "all",
+                         "executionTimeout":  3600
+                     },
+        "nodes":  [
+                      {
+                          "id":  "sched-discovery",
+                          "name":  "Daily 08:00",
+                          "type":  "n8n-nodes-base.scheduleTrigger",
+                          "typeVersion":  1.3,
+                          "position":  [
+                                           0,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "rule":  {
+                                                          "interval":  [
+                                                                           {
+                                                                               "field":  "cronExpression",
+                                                                               "expression":  "0 8 * * *"
+                                                                           }
+                                                                       ]
+                                                      }
+                                         }
+                      },
+                      {
+                          "id":  "build-searches",
+                          "name":  "Build Discovery Searches",
+                          "type":  "n8n-nodes-base.code",
+                          "typeVersion":  2,
+                          "position":  [
+                                           260,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "mode":  "runOnceForAllItems",
+                                             "language":  "javaScript",
+                                             "jsCode":  "const queries = [\n  \u0027wellness blog affiliate CBD\u0027, \u0027CBD blog product reviews\u0027, \u0027fitness influencer recovery supplements\u0027,\n  \u0027supplement website product reviews\u0027, \u0027recovery website wellness\u0027, \u0027ecommerce review site CBD\u0027,\n  \u0027coupon site wellness CBD\u0027, \u0027deal site supplements\u0027, \u0027lifestyle publisher wellness products\u0027\n];\nreturn queries.map((query, i) =\u003e ({ json: { query, niche_seed: query.split(\u0027 \u0027)[0], maxResults: Number($vars.DISCOVERY_RESULTS_PER_QUERY || 50), runKey: `${new Date().toISOString().slice(0,10)}-${i}` } }));"
+                                         }
+                      },
+                      {
+                          "id":  "apify-discovery",
+                          "name":  "Apify - Search/Scrape Prospects",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           520,
+                                           0
+                                       ],
+                          "retryOnFail":  true,
+                          "maxTries":  3,
+                          "waitBetweenTries":  10000,
+                          "parameters":  {
+                                             "method":  "POST",
+                                             "url":  "={{\u0027https://api.apify.com/v2/acts/\u0027 + ($vars.APIFY_SEARCH_ACTOR || \u0027apify~google-search-scraper\u0027) + \u0027/run-sync-get-dataset-items?token=\u0027 + $vars.APIFY_TOKEN}}",
+                                             "sendBody":  true,
+                                             "contentType":  "json",
+                                             "jsonBody":  "={{ { queries: $json.query, maxPagesPerQuery: 1, resultsPerPage: Math.min($json.maxResults, 100), languageCode: \u0027en\u0027, countryCode: \u0027us\u0027 } }}",
+                                             "options":  {
+                                                             "timeout":  300000,
+                                                             "response":  {
+                                                                              "response":  {
+                                                                                               "neverError":  true
+                                                                                           }
+                                                                          }
+                                                         }
+                                         }
+                      },
+                      {
+                          "id":  "normalize-leads",
+                          "name":  "Normalize Leads",
+                          "type":  "n8n-nodes-base.code",
+                          "typeVersion":  2,
+                          "position":  [
+                                           780,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "mode":  "runOnceForAllItems",
+                                             "language":  "javaScript",
+                                             "jsCode":  "const seen = new Set();\nconst now = new Date().toISOString();\nconst rows = [];\nfor (const item of $input.all()) {\n  const data = Array.isArray(item.json) ? item.json : (item.json.organicResults || item.json.results || item.json.items || []);\n  for (const r of data) {\n    const url = r.url || r.link || r.displayedUrl || \u0027\u0027;\n    if (!url) continue;\n    let domain = \u0027\u0027;\n    try { domain = new URL(url.startsWith(\u0027http\u0027) ? url : `https://${url}`).hostname.replace(/^www\\./,\u0027\u0027).toLowerCase(); } catch { continue; }\n    if (seen.has(domain)) continue;\n    seen.add(domain);\n    rows.push({ lead_id: domain, domain, website_url: url, company_name: r.title || \u0027\u0027, author_name: \u0027\u0027, email: \u0027\u0027, contact_page: \u0027\u0027, social_links: \u0027\u0027, niche_category: item.json.niche_seed || \u0027\u0027, source: \u0027Apify discovery\u0027, discovery_query: item.json.query || \u0027\u0027, status: \u0027NEW\u0027, created_at: now, last_checked_at: now });\n  }\n}\nconst values = rows.map(l =\u003e [l.lead_id,l.domain,l.website_url,l.company_name,l.author_name,l.email,l.contact_page,l.social_links,l.niche_category,l.source,l.discovery_query,l.status,l.created_at,l.last_checked_at]);\nreturn [{ json: { count: rows.length, leads: rows, sheetsPayload: { range: \u0027scraped_leads!A2:N\u0027, majorDimension: \u0027ROWS\u0027, values } } }];"
+                                         }
+                      },
+                      {
+                          "id":  "sheets-leads",
+                          "name":  "Sheets - Append Scraped Leads",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           1040,
+                                           0
+                                       ],
+                          "retryOnFail":  true,
+                          "maxTries":  3,
+                          "parameters":  {
+                                             "method":  "POST",
+                                             "url":  "={{\u0027https://sheets.googleapis.com/v4/spreadsheets/\u0027 + $vars.GOOGLE_SHEET_ID + \u0027/values/scraped_leads!A:N:append?valueInputOption=USER_ENTERED\u0026insertDataOption=INSERT_ROWS\u0027}}",
+                                             "authentication":  "predefinedCredentialType",
+                                             "nodeCredentialType":  "googleApi",
+                                             "sendBody":  true,
+                                             "contentType":  "json",
+                                             "jsonBody":  "={{ { values: $json.sheetsPayload.values } }}",
+                                             "options":  {
+                                                             "timeout":  120000
+                                                         }
+                                         }
+                      }
+                  ],
+        "connections":  {
+                            "Daily 08:00":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "Build Discovery Searches",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                            "Build Discovery Searches":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "Apify - Search/Scrape Prospects",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                            "Apify - Search/Scrape Prospects":  {
+                                                                    "main":  [
+                                                                                 [
+                                                                                     {
+                                                                                         "node":  "Normalize Leads",
+                                                                                         "type":  "main",
+                                                                                         "index":  0
+                                                                                     }
+                                                                                 ]
+                                                                             ]
+                                                                },
+                            "Normalize Leads":  {
+                                                    "main":  [
+                                                                 [
+                                                                     {
+                                                                         "node":  "Sheets - Append Scraped Leads",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     }
+                                                                 ]
+                                                             ]
+                                                }
+                        }
+    },
+    {
+        "name":  "Greenroads 03 - Contact Enrichment",
+        "settings":  {
+                         "executionOrder":  "v1",
+                         "timezone":  "Asia/Manila",
+                         "saveDataSuccessExecution":  "none",
+                         "saveDataErrorExecution":  "all",
+                         "executionTimeout":  3600
+                     },
+        "nodes":  [
+                      {
+                          "id":  "sched-enrich",
+                          "name":  "Daily 09:00",
+                          "type":  "n8n-nodes-base.scheduleTrigger",
+                          "typeVersion":  1.3,
+                          "position":  [
+                                           0,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "rule":  {
+                                                          "interval":  [
+                                                                           {
+                                                                               "field":  "cronExpression",
+                                                                               "expression":  "0 9 * * *"
+                                                                           }
+                                                                       ]
+                                                      }
+                                         }
+                      },
+                      {
+                          "id":  "read-leads",
+                          "name":  "Sheets - Read New Leads",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           260,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "method":  "GET",
+                                             "url":  "={{\u0027https://sheets.googleapis.com/v4/spreadsheets/\u0027 + $vars.GOOGLE_SHEET_ID + \u0027/values/scraped_leads!A:N\u0027}}",
+                                             "authentication":  "predefinedCredentialType",
+                                             "nodeCredentialType":  "googleApi",
+                                             "options":  {
+                                                             "timeout":  120000
+                                                         }
+                                         }
+                      },
+                      {
+                          "id":  "prepare-enrichment",
+                          "name":  "Prepare Enrichment Queue",
+                          "type":  "n8n-nodes-base.code",
+                          "typeVersion":  2,
+                          "position":  [
+                                           520,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "mode":  "runOnceForAllItems",
+                                             "language":  "javaScript",
+                                             "jsCode":  "const values = $input.first().json.values || [];\nconst headers = values[0] || [];\nconst rows = values.slice(1).map(row =\u003e Object.fromEntries(headers.map((h,i)=\u003e[h,row[i]||\u0027\u0027])));\nconst eligible = rows.filter(r =\u003e [\u0027NEW\u0027,\u0027NEEDS_ENRICHMENT\u0027,\u0027\u0027].includes(String(r.status || \u0027\u0027).toUpperCase())).slice(0, Number($vars.ENRICHMENT_BATCH_SIZE || 100));\nreturn eligible.map(r =\u003e ({ json: { ...r, startUrls: [{ url: r.website_url }], maxPages: 6 } }));"
+                                         }
+                      },
+                      {
+                          "id":  "apify-enrich",
+                          "name":  "Apify - Crawl Contact Signals",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           780,
+                                           0
+                                       ],
+                          "retryOnFail":  true,
+                          "maxTries":  3,
+                          "waitBetweenTries":  10000,
+                          "parameters":  {
+                                             "method":  "POST",
+                                             "url":  "={{\u0027https://api.apify.com/v2/acts/\u0027 + ($vars.APIFY_CONTACT_ACTOR || \u0027apify~website-content-crawler\u0027) + \u0027/run-sync-get-dataset-items?token=\u0027 + $vars.APIFY_TOKEN}}",
+                                             "sendBody":  true,
+                                             "contentType":  "json",
+                                             "jsonBody":  "={{ { startUrls: $json.startUrls, maxCrawlPages: $json.maxPages, crawlerType: \u0027playwright:firefox\u0027, saveHtml: false, saveMarkdown: true, includeUrlGlobs: [\u0027**/contact**\u0027,\u0027**/about**\u0027,\u0027**/advertise**\u0027,\u0027**/partnership**\u0027,\u0027**/collab**\u0027,\u0027**/privacy**\u0027,\u0027**/\u0027], excludeUrlGlobs: [\u0027**/cart**\u0027,\u0027**/checkout**\u0027,\u0027**/login**\u0027] } }}",
+                                             "options":  {
+                                                             "timeout":  300000,
+                                                             "response":  {
+                                                                              "response":  {
+                                                                                               "neverError":  true
+                                                                                           }
+                                                                          }
+                                                         }
+                                         }
+                      },
+                      {
+                          "id":  "extract-contacts",
+                          "name":  "Extract Contacts and Skip Rules",
+                          "type":  "n8n-nodes-base.code",
+                          "typeVersion":  2,
+                          "position":  [
+                                           1040,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "mode":  "runOnceForAllItems",
+                                             "language":  "javaScript",
+                                             "jsCode":  "const emailRegex = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi;\nconst socialRegex = /https?:\\/\\/(www\\.)?(linkedin|instagram|facebook|x|twitter|tiktok)\\.com\\/[^\\s\"\u0027\u003c\u003e]+/gi;\nconst now = new Date().toISOString();\nconst out = [];\nfor (const item of $input.all()) {\n  const pages = Array.isArray(item.json) ? item.json : [item.json];\n  const blob = pages.map(p =\u003e `${p.url || \u0027\u0027}\\n${p.text || \u0027\u0027}\\n${p.markdown || \u0027\u0027}\\n${p.html || \u0027\u0027}`).join(\u0027\\n\u0027);\n  const emails = [...new Set((blob.match(emailRegex) || []).map(e =\u003e e.toLowerCase()).filter(e =\u003e !e.includes(\u0027example.\u0027) \u0026\u0026 !e.includes(\u0027sentry.\u0027) \u0026\u0026 !e.includes(\u0027wixpress.\u0027)))];\n  const preferred = emails.find(e =\u003e /partnership|partner|affiliate|marketing|collab|business/.test(e)) || emails[0] || \u0027\u0027;\n  const socials = [...new Set(blob.match(socialRegex) || [])].slice(0, 10).join(\u0027, \u0027);\n  const contactPage = (pages.find(p =\u003e /contact|partner|advertise|about/i.test(p.url || \u0027\u0027)) || {}).url || \u0027\u0027;\n  out.push({ json: { email: preferred, all_emails: emails.join(\u0027, \u0027), social_links: socials, contact_page: contactPage, enrichment_status: preferred ? \u0027ENRICHED\u0027 : \u0027NO_EMAIL\u0027, enriched_at: now } });\n}\nconst values = out.map(i =\u003e [i.json.email,i.json.all_emails,i.json.contact_page,i.json.social_links,i.json.enrichment_status,i.json.enriched_at]);\nreturn [{ json: { count: out.length, enriched: out.map(i=\u003ei.json), sheetsPayload: { values } } }];"
+                                         }
+                      },
+                      {
+                          "id":  "sheets-enriched",
+                          "name":  "Sheets - Append Enrichment Results",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           1300,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "method":  "POST",
+                                             "url":  "={{\u0027https://sheets.googleapis.com/v4/spreadsheets/\u0027 + $vars.GOOGLE_SHEET_ID + \u0027/values/contacted!A:F:append?valueInputOption=USER_ENTERED\u0026insertDataOption=INSERT_ROWS\u0027}}",
+                                             "authentication":  "predefinedCredentialType",
+                                             "nodeCredentialType":  "googleApi",
+                                             "sendBody":  true,
+                                             "contentType":  "json",
+                                             "jsonBody":  "={{ { values: $json.sheetsPayload.values } }}",
+                                             "options":  {
+                                                             "timeout":  120000
+                                                         }
+                                         }
+                      }
+                  ],
+        "connections":  {
+                            "Daily 09:00":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "Sheets - Read New Leads",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                            "Sheets - Read New Leads":  {
+                                                            "main":  [
+                                                                         [
+                                                                             {
+                                                                                 "node":  "Prepare Enrichment Queue",
+                                                                                 "type":  "main",
+                                                                                 "index":  0
+                                                                             }
+                                                                         ]
+                                                                     ]
+                                                        },
+                            "Prepare Enrichment Queue":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "Apify - Crawl Contact Signals",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                            "Apify - Crawl Contact Signals":  {
+                                                                  "main":  [
+                                                                               [
+                                                                                   {
+                                                                                       "node":  "Extract Contacts and Skip Rules",
+                                                                                       "type":  "main",
+                                                                                       "index":  0
+                                                                                   }
+                                                                               ]
+                                                                           ]
+                                                              },
+                            "Extract Contacts and Skip Rules":  {
+                                                                    "main":  [
+                                                                                 [
+                                                                                     {
+                                                                                         "node":  "Sheets - Append Enrichment Results",
+                                                                                         "type":  "main",
+                                                                                         "index":  0
+                                                                                     }
+                                                                                 ]
+                                                                             ]
+                                                                }
+                        }
+    },
+    {
+        "name":  "Greenroads 04 - AI Outreach Generation",
+        "settings":  {
+                         "executionOrder":  "v1",
+                         "timezone":  "Asia/Manila",
+                         "saveDataSuccessExecution":  "none",
+                         "saveDataErrorExecution":  "all",
+                         "executionTimeout":  1800
+                     },
+        "nodes":  [
+                      {
+                          "id":  "sched-ai",
+                          "name":  "Daily 10:00",
+                          "type":  "n8n-nodes-base.scheduleTrigger",
+                          "typeVersion":  1.3,
+                          "position":  [
+                                           0,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "rule":  {
+                                                          "interval":  [
+                                                                           {
+                                                                               "field":  "cronExpression",
+                                                                               "expression":  "0 10 * * *"
+                                                                           }
+                                                                       ]
+                                                      }
+                                         }
+                      },
+                      {
+                          "id":  "read-approvals",
+                          "name":  "Sheets - Read Approvals",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           260,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "method":  "GET",
+                                             "url":  "={{\u0027https://sheets.googleapis.com/v4/spreadsheets/\u0027 + $vars.GOOGLE_SHEET_ID + \u0027/values/approvals!A:Z\u0027}}",
+                                             "authentication":  "predefinedCredentialType",
+                                             "nodeCredentialType":  "googleApi",
+                                             "options":  {
+                                                             "timeout":  120000
+                                                         }
+                                         }
+                      },
+                      {
+                          "id":  "prepare-prompts",
+                          "name":  "Prepare Outreach Prompts",
+                          "type":  "n8n-nodes-base.code",
+                          "typeVersion":  2,
+                          "position":  [
+                                           520,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "mode":  "runOnceForAllItems",
+                                             "language":  "javaScript",
+                                             "jsCode":  "const values = $input.first().json.values || [];\nconst headers = values[0] || [];\nconst rows = values.slice(1).map(row =\u003e Object.fromEntries(headers.map((h,i)=\u003e[h,row[i]||\u0027\u0027])));\nconst approved = rows.filter(r =\u003e String(r.approval_status || \u0027\u0027).toUpperCase() === \u0027APPROVED\u0027 \u0026\u0026 !r.generated_at).slice(0, Number($vars.AI_BATCH_SIZE || 50));\nreturn approved.map(r =\u003e {\n  const type = String(r.email_type || r.classification || \u0027NEW_OUTREACH\u0027).toUpperCase().includes(\u0027LOW\u0027) ? \u0027LOW_PERFORMER\u0027 : \u0027NEW_OUTREACH\u0027;\n  const facts = JSON.stringify(r);\n  const prompt = type === \u0027LOW_PERFORMER\u0027\n    ? `Write a short helpful affiliate optimization email for an existing Greenroads affiliate. Use these facts: ${facts}. Mention best-selling Greenroads products, conversion optimization ideas, banner/creative suggestions, and coupon opportunities. Return JSON with subject,intro,body,cta,follow_up_1,follow_up_2.`\n    : `Write a short personalized recruitment email for a potential Greenroads affiliate. Use these facts: ${facts}. Mention affiliate commissions, wellness/CBD market fit, why their audience matches Greenroads, and an AWIN partnership CTA. Return JSON with subject,intro,body,cta,follow_up_1,follow_up_2.`;\n  return { json: { ...r, email_type: type, prompt } };\n});"
+                                         }
+                      },
+                      {
+                          "id":  "openai-generate",
+                          "name":  "OpenAI - Generate Outreach",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           780,
+                                           0
+                                       ],
+                          "retryOnFail":  true,
+                          "maxTries":  3,
+                          "waitBetweenTries":  5000,
+                          "parameters":  {
+                                             "method":  "POST",
+                                             "url":  "https://api.openai.com/v1/chat/completions",
+                                             "sendHeaders":  true,
+                                             "headerParameters":  {
+                                                                      "parameters":  [
+                                                                                         {
+                                                                                             "name":  "Authorization",
+                                                                                             "value":  "={{\u0027Bearer \u0027 + $vars.OPENAI_API_KEY}}"
+                                                                                         },
+                                                                                         {
+                                                                                             "name":  "Content-Type",
+                                                                                             "value":  "application/json"
+                                                                                         }
+                                                                                     ]
+                                                                  },
+                                             "sendBody":  true,
+                                             "contentType":  "json",
+                                             "jsonBody":  "={{ { model: $vars.OPENAI_MODEL || \u0027gpt-4.1-mini\u0027, temperature: 0.4, response_format: { type: \u0027json_object\u0027 }, messages: [{ role: \u0027system\u0027, content: \u0027You write human, concise, non-spammy affiliate outreach for Greenroads. Never invent metrics or claims. Use plain text only.\u0027 }, { role: \u0027user\u0027, content: $json.prompt }] } }}",
+                                             "options":  {
+                                                             "timeout":  120000,
+                                                             "response":  {
+                                                                              "response":  {
+                                                                                               "neverError":  true
+                                                                                           }
+                                                                          }
+                                                         }
+                                         }
+                      },
+                      {
+                          "id":  "stage-copy",
+                          "name":  "Stage Generated Emails",
+                          "type":  "n8n-nodes-base.code",
+                          "typeVersion":  2,
+                          "position":  [
+                                           1040,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "mode":  "runOnceForAllItems",
+                                             "language":  "javaScript",
+                                             "jsCode":  "const now = new Date().toISOString();\nconst values = [];\nfor (const item of $input.all()) {\n  const choice = item.json.choices?.[0]?.message?.content || \u0027{}\u0027;\n  let copy = {};\n  try { copy = JSON.parse(choice); } catch { copy = { subject: \u0027Greenroads affiliate partnership\u0027, body: choice }; }\n  values.push([item.json.email || item.json.business_email || \u0027\u0027, item.json.domain || \u0027\u0027, item.json.email_type || \u0027NEW_OUTREACH\u0027, copy.subject || \u0027\u0027, `${copy.intro || \u0027\u0027}\\n\\n${copy.body || \u0027\u0027}\\n\\n${copy.cta || \u0027\u0027}`.trim(), copy.follow_up_1 || \u0027\u0027, copy.follow_up_2 || \u0027\u0027, \u0027READY_TO_SEND\u0027, now]);\n}\nreturn [{ json: { sheetsPayload: { values } } }];"
+                                         }
+                      },
+                      {
+                          "id":  "sheets-generated",
+                          "name":  "Sheets - Append Outreach Log",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           1300,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "method":  "POST",
+                                             "url":  "={{\u0027https://sheets.googleapis.com/v4/spreadsheets/\u0027 + $vars.GOOGLE_SHEET_ID + \u0027/values/outreach_log!A:I:append?valueInputOption=USER_ENTERED\u0026insertDataOption=INSERT_ROWS\u0027}}",
+                                             "authentication":  "predefinedCredentialType",
+                                             "nodeCredentialType":  "googleApi",
+                                             "sendBody":  true,
+                                             "contentType":  "json",
+                                             "jsonBody":  "={{ { values: $json.sheetsPayload.values } }}",
+                                             "options":  {
+                                                             "timeout":  120000
+                                                         }
+                                         }
+                      }
+                  ],
+        "connections":  {
+                            "Daily 10:00":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "Sheets - Read Approvals",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                            "Sheets - Read Approvals":  {
+                                                            "main":  [
+                                                                         [
+                                                                             {
+                                                                                 "node":  "Prepare Outreach Prompts",
+                                                                                 "type":  "main",
+                                                                                 "index":  0
+                                                                             }
+                                                                         ]
+                                                                     ]
+                                                        },
+                            "Prepare Outreach Prompts":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "OpenAI - Generate Outreach",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                            "OpenAI - Generate Outreach":  {
+                                                               "main":  [
+                                                                            [
+                                                                                {
+                                                                                    "node":  "Stage Generated Emails",
+                                                                                    "type":  "main",
+                                                                                    "index":  0
+                                                                                }
+                                                                            ]
+                                                                        ]
+                                                           },
+                            "Stage Generated Emails":  {
+                                                           "main":  [
+                                                                        [
+                                                                            {
+                                                                                "node":  "Sheets - Append Outreach Log",
+                                                                                "type":  "main",
+                                                                                "index":  0
+                                                                            }
+                                                                        ]
+                                                                    ]
+                                                       }
+                        }
+    },
+    {
+        "name":  "Greenroads 05 - Email Delivery and Followups",
+        "settings":  {
+                         "executionOrder":  "v1",
+                         "timezone":  "Asia/Manila",
+                         "saveDataSuccessExecution":  "none",
+                         "saveDataErrorExecution":  "all",
+                         "executionTimeout":  1800
+                     },
+        "nodes":  [
+                      {
+                          "id":  "sched-email",
+                          "name":  "Hourly Business Hours",
+                          "type":  "n8n-nodes-base.scheduleTrigger",
+                          "typeVersion":  1.3,
+                          "position":  [
+                                           0,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "rule":  {
+                                                          "interval":  [
+                                                                           {
+                                                                               "field":  "cronExpression",
+                                                                               "expression":  "0 9-17 * * 1-5"
+                                                                           }
+                                                                       ]
+                                                      }
+                                         }
+                      },
+                      {
+                          "id":  "read-outreach",
+                          "name":  "Sheets - Read Outreach Queue",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           260,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "method":  "GET",
+                                             "url":  "={{\u0027https://sheets.googleapis.com/v4/spreadsheets/\u0027 + $vars.GOOGLE_SHEET_ID + \u0027/values/outreach_log!A:Z\u0027}}",
+                                             "authentication":  "predefinedCredentialType",
+                                             "nodeCredentialType":  "googleApi",
+                                             "options":  {
+                                                             "timeout":  120000
+                                                         }
+                                         }
+                      },
+                      {
+                          "id":  "dedupe-queue",
+                          "name":  "Dedupe and Build Send Queue",
+                          "type":  "n8n-nodes-base.code",
+                          "typeVersion":  2,
+                          "position":  [
+                                           520,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "mode":  "runOnceForAllItems",
+                                             "language":  "javaScript",
+                                             "jsCode":  "const values = $input.first().json.values || [];\nconst headers = values[0] || [];\nconst rows = values.slice(1).map((row, idx) =\u003e ({ row_number: idx + 2, ...Object.fromEntries(headers.map((h,i)=\u003e[h,row[i]||\u0027\u0027])) }));\nconst now = new Date();\nconst sentDomains = new Map();\nfor (const r of rows) {\n  const domain = String(r.domain || \u0027\u0027).toLowerCase();\n  if (r.sent_date \u0026\u0026 domain) sentDomains.set(domain, new Date(r.sent_date));\n}\nconst limit = Number($vars.GMAIL_SEND_LIMIT_PER_RUN || 40);\nconst due = [];\nfor (const r of rows) {\n  const status = String(r.status || \u0027\u0027).toUpperCase();\n  const response = String(r.response_status || \u0027\u0027).toUpperCase();\n  const email = String(r.email || \u0027\u0027).toLowerCase();\n  const domain = String(r.domain || \u0027\u0027).toLowerCase();\n  let include = true;\n  if (!email || response === \u0027REPLIED\u0027 || status === \u0027REPLIED\u0027 || status === \u0027BLACKLISTED\u0027) include = false;\n  if (include \u0026\u0026 status === \u0027READY_TO_SEND\u0027) include = true;\n  else if (include \u0026\u0026 status === \u0027SENT\u0027 \u0026\u0026 r.sent_date) include = (now - new Date(r.sent_date)) / 86400000 \u003e= 5 \u0026\u0026 !r.followup_1_sent_at;\n  else if (include \u0026\u0026 status === \u0027FOLLOWUP_1_SENT\u0027 \u0026\u0026 r.followup_1_sent_at) include = (now - new Date(r.followup_1_sent_at)) / 86400000 \u003e= 10 \u0026\u0026 !r.followup_2_sent_at;\n  else if (include) {\n    const last = sentDomains.get(domain);\n    include = !last || (now - last) / 86400000 \u003e= Number($vars.DOMAIN_COOLDOWN_DAYS || 45);\n  }\n  if (include) due.push(r);\n  if (due.length \u003e= limit) break;\n}\nreturn due.map(r =\u003e {\n  const status = String(r.status || \u0027\u0027).toUpperCase();\n  const followupNumber = status === \u0027SENT\u0027 ? 1 : (status === \u0027FOLLOWUP_1_SENT\u0027 ? 2 : 0);\n  const body = followupNumber === 1 ? r.follow_up_1 : (followupNumber === 2 ? r.follow_up_2 : r.body);\n  return { json: { ...r, followupNumber, send_body: body, send_subject: followupNumber ? `Re: ${r.subject}` : r.subject } };\n});"
+                                         }
+                      },
+                      {
+                          "id":  "gmail-search",
+                          "name":  "Gmail - Check Replies",
+                          "type":  "n8n-nodes-base.gmail",
+                          "typeVersion":  2.2,
+                          "position":  [
+                                           780,
+                                           -120
+                                       ],
+                          "alwaysOutputData":  true,
+                          "parameters":  {
+                                             "resource":  "message",
+                                             "operation":  "getAll",
+                                             "returnAll":  false,
+                                             "limit":  1,
+                                             "filters":  {
+                                                             "q":  "={{\u0027from:\u0027 + $json.email + \u0027 newer_than:30d\u0027}}"
+                                                         }
+                                         }
+                      },
+                      {
+                          "id":  "filter-no-reply",
+                          "name":  "Filter No Reply",
+                          "type":  "n8n-nodes-base.code",
+                          "typeVersion":  2,
+                          "position":  [
+                                           910,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "mode":  "runOnceForAllItems",
+                                             "language":  "javaScript",
+                                             "jsCode":  "const original = $(\u0027Dedupe and Build Send Queue\u0027).all();\nconst replyChecks = $input.all();\nconst sendable = [];\nfor (let i = 0; i \u003c original.length; i++) {\n  const reply = replyChecks[i]?.json || {};\n  const hasReply = Boolean(reply.id || reply.threadId || reply.messages?.length);\n  if (!hasReply) sendable.push({ json: original[i].json, pairedItem: { item: i } });\n}\nreturn sendable;"
+                                         }
+                      },
+                      {
+                          "id":  "gmail-send",
+                          "name":  "Gmail - Send Outreach",
+                          "type":  "n8n-nodes-base.gmail",
+                          "typeVersion":  2.2,
+                          "position":  [
+                                           1040,
+                                           0
+                                       ],
+                          "retryOnFail":  true,
+                          "maxTries":  2,
+                          "waitBetweenTries":  30000,
+                          "parameters":  {
+                                             "resource":  "message",
+                                             "operation":  "send",
+                                             "sendTo":  "={{$json.email}}",
+                                             "subject":  "={{$json.send_subject}}",
+                                             "emailType":  "text",
+                                             "message":  "={{$json.send_body}}",
+                                             "options":  {
+                                                             "senderName":  "Greenroads Partnerships"
+                                                         }
+                                         }
+                      },
+                      {
+                          "id":  "log-send",
+                          "name":  "Sheets - Log Send/Followup",
+                          "type":  "n8n-nodes-base.httpRequest",
+                          "typeVersion":  4.4,
+                          "position":  [
+                                           1300,
+                                           0
+                                       ],
+                          "parameters":  {
+                                             "method":  "POST",
+                                             "url":  "={{\u0027https://sheets.googleapis.com/v4/spreadsheets/\u0027 + $vars.GOOGLE_SHEET_ID + \u0027/values/followups!A:H:append?valueInputOption=USER_ENTERED\u0026insertDataOption=INSERT_ROWS\u0027}}",
+                                             "authentication":  "predefinedCredentialType",
+                                             "nodeCredentialType":  "googleApi",
+                                             "sendBody":  true,
+                                             "contentType":  "json",
+                                             "jsonBody":  "={{ { values: [[ $json.email, $json.domain, $json.followupNumber, $json.send_subject, new Date().toISOString(), $json.id || \u0027\u0027, \u0027SENT\u0027, $json.row_number ]] } }}",
+                                             "options":  {
+                                                             "timeout":  120000
+                                                         }
+                                         }
+                      }
+                  ],
+        "connections":  {
+                            "Hourly Business Hours":  {
+                                                          "main":  [
+                                                                       [
+                                                                           {
+                                                                               "node":  "Sheets - Read Outreach Queue",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                                       ]
+                                                                   ]
+                                                      },
+                            "Sheets - Read Outreach Queue":  {
+                                                                 "main":  [
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "Dedupe and Build Send Queue",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ]
+                                                                          ]
+                                                             },
+                            "Dedupe and Build Send Queue":  {
+                                                                "main":  [
+                                                                             [
+                                                                                 {
+                                                                                     "node":  "Gmail - Check Replies",
+                                                                                     "type":  "main",
+                                                                                     "index":  0
+                                                                                 }
+                                                                             ]
+                                                                         ]
+                                                            },
+                            "Gmail - Check Replies":  {
+                                                          "main":  [
+                                                                       [
+                                                                           {
+                                                                               "node":  "Filter No Reply",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                                       ]
+                                                                   ]
+                                                      },
+                            "Filter No Reply":  {
+                                                    "main":  [
+                                                                 [
+                                                                     {
+                                                                         "node":  "Gmail - Send Outreach",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     }
+                                                                 ]
+                                                             ]
+                                                },
+                            "Gmail - Send Outreach":  {
+                                                          "main":  [
+                                                                       [
+                                                                           {
+                                                                               "node":  "Sheets - Log Send/Followup",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                                       ]
+                                                                   ]
+                                                      }
+                        }
+    }
+]

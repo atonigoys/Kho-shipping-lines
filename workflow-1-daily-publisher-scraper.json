@@ -1,0 +1,1081 @@
+{
+  "name": "Green Roads — Daily Publisher Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Green Roads — Daily Publisher Contact Scraper\n\n**Schedule:** Daily 09:00 AM UTC\n**Sources:** AWIN API + AWIN UI Profile Scrape + Hunter.io\n**Output:** Tab 1 (Publishers), Tab 2 (Skipped), Tab 3 (Rate Limit Log)\n**API limits:** AWIN 20 req/min · Hunter ~10 req/min\n\n⚠️ Refresh AWIN session cookie every 24-48 hours.\n\n### Workflow variables required (set under Workflow → Variables):\n- `AWIN_ADVERTISER_ID`\n- `SHEET_ID`\n- `HUNTER_MONTHLY_LIMIT` (default 480)\n- `LOW_CLICK_THRESHOLD` (default 100)\n- `ZERO_ACTIVITY_THRESHOLD` (default 2)\n- `TIMEZONE` (default UTC)\n\n### Credentials to map after import:\n- `AWIN_API_TOKEN` (httpHeaderAuth → Authorization: Bearer …)\n- `AWIN_SESSION_COOKIE` (httpHeaderAuth → Cookie: …)\n- `HUNTER_API_KEY` (httpQueryAuth → api_key=…)\n- `GOOGLE_SHEETS_OAUTH` (Google Sheets OAuth2)",
+        "height": 460,
+        "width": 540,
+        "color": 4
+      },
+      "id": "sticky_header",
+      "name": "Sticky — Workflow Header",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-400, -480]
+    },
+    {
+      "parameters": {
+        "content": "### Section 1 — Triggers\nDaily 09:00 UTC + manual on-demand.",
+        "height": 200,
+        "width": 320,
+        "color": 5
+      },
+      "id": "sticky_s1",
+      "name": "Sticky — Section 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-400, 60]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "n1a",
+      "name": "Daily Trigger — 09:00 AM UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-340, 160]
+    },
+    {
+      "parameters": {},
+      "id": "n1b",
+      "name": "Manual Trigger — On Demand",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-340, 320]
+    },
+    {
+      "parameters": {
+        "content": "### Section 2 — Pre-flight checks\nBuild date range and guard Hunter monthly budget.",
+        "height": 200,
+        "width": 320,
+        "color": 5
+      },
+      "id": "sticky_s2",
+      "name": "Sticky — Section 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-40, 60]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const now = new Date();\nconst startDate = new Date(now.getFullYear(), now.getMonth(), 1)\n  .toISOString().split('T')[0];\nconst endDate = now.toISOString().split('T')[0];\nreturn [{ json: { startDate, endDate } }];"
+      },
+      "id": "n2a",
+      "name": "Generate Date Range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [40, 240]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst used = staticData.hunterCallsThisMonth || 0;\nconst LIMIT = $vars.HUNTER_MONTHLY_LIMIT || 480;\n\nif (used >= LIMIT) {\n  throw new Error(\n    `Hunter.io monthly budget reached: ${used}/${LIMIT} calls used. ` +\n    `Reset counter in Static Data or upgrade your Hunter.io plan.`\n  );\n}\n\nreturn [{ json: { ...$json, hunter_calls_used: used, hunter_remaining: LIMIT - used } }];"
+      },
+      "id": "n2b",
+      "name": "Check Hunter Budget",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 240]
+    },
+    {
+      "parameters": {
+        "content": "### Section 3 — Fetch publishers from AWIN API\n3000 ms wait between calls keeps us under AWIN 20 req/min.",
+        "height": 220,
+        "width": 760,
+        "color": 5
+      },
+      "id": "sticky_s3",
+      "name": "Sticky — Section 3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [440, 60]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.awin.com/advertisers/{{ $vars.AWIN_ADVERTISER_ID }}/publishers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "accessToken",
+              "value": "={{ $credentials.httpHeaderAuth?.value || '' }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "n3a",
+      "name": "AWIN — Get All Publishers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 240],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AWIN_API_TOKEN_ID",
+          "name": "AWIN_API_TOKEN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "n3a_wait",
+      "name": "Wait 3s — After AWIN Publishers",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [720, 240],
+      "webhookId": "wait-after-awin-publishers"
+    },
+    {
+      "parameters": {
+        "content": "Wait 3000 ms — AWIN hard limit 20 req/min, 3 s spacing keeps us safely under.",
+        "height": 90,
+        "width": 240,
+        "color": 6
+      },
+      "id": "sticky_n3a_wait",
+      "name": "Sticky — Wait After AWIN Publishers",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [700, 360]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.awin.com/advertisers/{{ $vars.AWIN_ADVERTISER_ID }}/reports/publisher",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "accessToken",
+              "value": "={{ $credentials.httpHeaderAuth?.value || '' }}"
+            },
+            {
+              "name": "startDate",
+              "value": "={{ $('Generate Date Range').item.json.startDate }}"
+            },
+            {
+              "name": "endDate",
+              "value": "={{ $('Generate Date Range').item.json.endDate }}"
+            },
+            {
+              "name": "dateType",
+              "value": "transaction"
+            },
+            {
+              "name": "timezone",
+              "value": "UTC"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "n3b",
+      "name": "AWIN — Get Publisher Performance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 240],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AWIN_API_TOKEN_ID",
+          "name": "AWIN_API_TOKEN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "n3b_wait",
+      "name": "Wait 3s — After AWIN Performance",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1120, 240],
+      "webhookId": "wait-after-awin-performance"
+    },
+    {
+      "parameters": {
+        "content": "Wait 3000 ms — AWIN rate-limit buffer between performance call and merge.",
+        "height": 90,
+        "width": 240,
+        "color": 6
+      },
+      "id": "sticky_n3b_wait",
+      "name": "Sticky — Wait After AWIN Performance",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1100, 360]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByFields",
+        "fieldsToMatchString": "id,publisherId",
+        "joinMode": "keepEverything",
+        "options": {
+          "clashHandling": {
+            "values": {
+              "resolveClash": "preferInput2"
+            }
+          }
+        }
+      },
+      "id": "n3c",
+      "name": "Merge Publisher List + Performance Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1320, 320]
+    },
+    {
+      "parameters": {
+        "content": "Left-join keeps every publisher even if they had zero activity this period.",
+        "height": 90,
+        "width": 240,
+        "color": 6
+      },
+      "id": "sticky_merge",
+      "name": "Sticky — Merge Behavior",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1300, 460]
+    },
+    {
+      "parameters": {
+        "content": "### Section 4 — Batch processing\n5 publishers per batch, 500 ms inter-batch spacing.",
+        "height": 200,
+        "width": 380,
+        "color": 5
+      },
+      "id": "sticky_s4",
+      "name": "Sticky — Section 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1540, 60]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "n4a",
+      "name": "Batch Publishers — 5 at a Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1620, 320]
+    },
+    {
+      "parameters": {
+        "amount": 500,
+        "unit": "milliseconds"
+      },
+      "id": "n4a_wait",
+      "name": "Wait 500ms — Inter-Batch",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1820, 240],
+      "webhookId": "wait-inter-batch"
+    },
+    {
+      "parameters": {
+        "content": "Wait 500 ms — inter-batch spacing prevents AWIN burst limit.",
+        "height": 90,
+        "width": 240,
+        "color": 6
+      },
+      "id": "sticky_n4a_wait",
+      "name": "Sticky — Inter-Batch Wait",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1800, 360]
+    },
+    {
+      "parameters": {
+        "content": "### Section 5 — Profile page scrape\nUses logged-in AWIN session cookie. 4 s wait after each request prevents session ban.",
+        "height": 220,
+        "width": 700,
+        "color": 5
+      },
+      "id": "sticky_s5",
+      "name": "Sticky — Section 5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2040, 60]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://ui.awin.com/profile/publisher/{{ $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml"
+            },
+            {
+              "name": "Referer",
+              "value": "https://ui.awin.com/"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "n5a",
+      "name": "AWIN UI — Scrape Publisher Profile Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2120, 240],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AWIN_SESSION_COOKIE_ID",
+          "name": "AWIN_SESSION_COOKIE"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "seconds"
+      },
+      "id": "n5a_wait",
+      "name": "Wait 4s — After Profile Scrape",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2360, 240],
+      "webhookId": "wait-after-profile"
+    },
+    {
+      "parameters": {
+        "content": "Wait 4000 ms — session-ban prevention. Cookie expires 24-48 h; refresh in credentials.",
+        "height": 90,
+        "width": 280,
+        "color": 6
+      },
+      "id": "sticky_n5a_wait",
+      "name": "Sticky — Profile Wait",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2340, 360]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const html = $json.data || $json.body || '';\n\n// Email from mailto: links\nconst emailMatch = html.match(/href=[\"']mailto:([^\"']+)[\"']/i);\nconst email = emailMatch ? emailMatch[1].trim().toLowerCase() : null;\n\n// Phone\nconst phoneMatch = html.match(/(?:tel:|phone|mobile|contact)[\\s\\S]{0,50}?([\\+\\d][\\d\\s\\-\\(\\)]{6,20})/i);\nconst phone = phoneMatch ? phoneMatch[1].replace(/\\s+/g, '').trim() : null;\n\n// Contact name (Firstname Lastname pattern)\nconst nameMatch = html.match(/(?:contact(?:\\s+name)?|account\\s+manager|fn)[\\s\\S]{0,100}?<[^>]+>\\s*([A-Z][a-z]+ [A-Z][a-z]+)/i);\nconst contactName = nameMatch ? nameMatch[1].trim() : null;\n\n// Website URL\nconst websiteMatch = html.match(/(?:website|primary\\s*url|promotional\\s*url)[\\s\\S]{0,200}?href=[\"'](https?:\\/\\/[^\"']+)[\"']/i);\nconst website = websiteMatch ? websiteMatch[1].trim() : null;\n\nconst contactHidden = /contact.*hidden|privacy.*setting|not\\s+publicly/i.test(html);\n\nreturn [{\n  json: {\n    ...$json,\n    scraped_email:        email,\n    scraped_phone:        phone,\n    scraped_contact_name: contactName,\n    scraped_website:      website,\n    contact_hidden:       contactHidden,\n    profile_scraped:      true\n  }\n}];"
+      },
+      "id": "n5b",
+      "name": "Parse Publisher Profile HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2560, 240]
+    },
+    {
+      "parameters": {
+        "content": "### Section 6 — Contact source decision tree\nProfile email → skip Hunter. No email → extract domain → Hunter.",
+        "height": 220,
+        "width": 740,
+        "color": 5
+      },
+      "id": "sticky_s6",
+      "name": "Sticky — Section 6",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2760, 60]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond_email_present",
+              "leftValue": "={{ $json.scraped_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n6a",
+      "name": "IF: Got Email from AWIN Profile?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2820, 240]
+    },
+    {
+      "parameters": {
+        "content": "TRUE → skip Hunter, build record.\nFALSE → extract domain, call Hunter.",
+        "height": 90,
+        "width": 280,
+        "color": 6
+      },
+      "id": "sticky_n6a",
+      "name": "Sticky — IF Profile Email",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2800, 380]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const raw = $json.scraped_website || $json.primaryUrl || $json.displayUrl || '';\n\nconst domain = raw\n  .replace(/https?:\\/\\//i, '')\n  .replace(/^www\\./i, '')\n  .split('/')[0]\n  .split('?')[0]\n  .trim()\n  .toLowerCase();\n\nconst isValid = domain.length > 3 && domain.includes('.');\n\nreturn [{ json: { ...$json, domain: isValid ? domain : null, domain_valid: isValid } }];"
+      },
+      "id": "n6b",
+      "name": "Extract Clean Domain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3060, 360]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond_domain_valid",
+              "leftValue": "={{ $json.domain_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n6c",
+      "name": "IF: Valid Domain to Search in Hunter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [3280, 360]
+    },
+    {
+      "parameters": {
+        "content": "TRUE → continue to Hunter section.\nFALSE → log Skipped, drop item.",
+        "height": 90,
+        "width": 280,
+        "color": 6
+      },
+      "id": "sticky_n6c",
+      "name": "Sticky — IF Valid Domain",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3260, 500]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Skipped",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publisher_id": "={{ $json.id }}",
+            "publisher_name": "={{ $json.name }}",
+            "reason": "No valid domain found",
+            "domain": "",
+            "date": "={{ $now.toISODate() }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "n6c_log",
+      "name": "Log Skipped — No Valid Domain",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3500, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "### Section 7 — Hunter.io enrichment\n5 s before, 2 s after; 60 s cooldown on 429.",
+        "height": 240,
+        "width": 1200,
+        "color": 5
+      },
+      "id": "sticky_s7",
+      "name": "Sticky — Section 7",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3500, 60]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "n7_pre_wait",
+      "name": "Wait 5s — Pre Hunter",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3500, 360],
+      "webhookId": "wait-pre-hunter"
+    },
+    {
+      "parameters": {
+        "content": "Wait 5000 ms — Hunter ~10 req/min on lower tiers.",
+        "height": 80,
+        "width": 220,
+        "color": 6
+      },
+      "id": "sticky_n7_pre_wait",
+      "name": "Sticky — Pre Hunter Wait",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3480, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.hunter.io/v2/domain-search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $json.domain }}"
+            },
+            {
+              "name": "limit",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "n7a",
+      "name": "Hunter.io — Domain Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3700, 360],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "REPLACE_HUNTER_API_KEY_ID",
+          "name": "HUNTER_API_KEY"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "n7a_post_wait",
+      "name": "Wait 2s — Post Hunter",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3900, 360],
+      "webhookId": "wait-post-hunter"
+    },
+    {
+      "parameters": {
+        "content": "Wait 2000 ms — consecutive Hunter call spacing.",
+        "height": 80,
+        "width": 220,
+        "color": 6
+      },
+      "id": "sticky_n7a_post",
+      "name": "Sticky — Post Hunter Wait",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3880, 480]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const data = $json.data || {};\nconst emails = data.emails || [];\n\nconst best = emails\n  .filter(e => (e.confidence || 0) >= 70)\n  .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0] || emails[0] || {};\n\nreturn [{\n  json: {\n    ...$json,\n    hunter_email:       best.value || null,\n    hunter_first_name:  best.first_name || null,\n    hunter_last_name:   best.last_name || null,\n    hunter_confidence:  best.confidence || null,\n    hunter_email_type:  best.type || null,\n    hunter_org:         data.organization || null,\n    hunter_phone:       data.phone_number || null\n  }\n}];"
+      },
+      "id": "n7c",
+      "name": "Extract Best Hunter.io Email Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4100, 360]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.hunterCallsThisMonth = (staticData.hunterCallsThisMonth || 0) + 1;\nreturn [{ json: { ...$json, hunter_total_calls: staticData.hunterCallsThisMonth } }];"
+      },
+      "id": "n7d",
+      "name": "Increment Hunter Usage Counter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4300, 360]
+    },
+    {
+      "parameters": {
+        "content": "### Section 8 — Build final enriched record\nMerge profile + Hunter sources with priority: profile > hunter > empty.",
+        "height": 200,
+        "width": 480,
+        "color": 5
+      },
+      "id": "sticky_s8",
+      "name": "Sticky — Section 8",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [4500, 60]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const d = $json;\n\nconst email = d.scraped_email || d.hunter_email || '';\nconst emailSource = d.scraped_email ? 'AWIN Profile'\n                  : d.hunter_email  ? 'Hunter.io'\n                  : 'Not Found';\n\nconst contactName = d.scraped_contact_name\n  || [d.hunter_first_name, d.hunter_last_name].filter(Boolean).join(' ')\n  || '';\n\nconst phone = d.scraped_phone || d.hunter_phone || '';\n\nreturn [{\n  json: {\n    publisher_id:      d.id,\n    publisher_name:    d.name || d.publisherName || '',\n    contact_name:      contactName,\n    email:             email,\n    email_source:      emailSource,\n    email_confidence:  d.hunter_confidence || '',\n    phone:             phone,\n    website:           d.scraped_website || d.domain || '',\n    domain:            d.domain || '',\n    promo_type:        d.primaryType || '',\n    region:            d.primaryRegion || '',\n    clicks:            d.clicks || 0,\n    impressions:       d.impressions || 0,\n    transactions:      d.totalNo || 0,\n    commission:        d.totalComm || 0,\n    status:            'active',\n    date_scraped:      new Date().toISOString().split('T')[0]\n  }\n}];"
+      },
+      "id": "n8a",
+      "name": "Build Final Enriched Publisher Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4560, 240]
+    },
+    {
+      "parameters": {
+        "content": "### Section 9 — Dedup + save\nRead existing IDs, skip duplicates, append new.",
+        "height": 220,
+        "width": 720,
+        "color": 5
+      },
+      "id": "sticky_s9",
+      "name": "Sticky — Section 9",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [5000, 60]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Publishers",
+          "mode": "name"
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      },
+      "id": "n9a",
+      "name": "Read Existing Publisher IDs from Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [5060, 240],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const incoming = $('Build Final Enriched Publisher Record').item.json;\nconst existing = $('Read Existing Publisher IDs from Sheet').all()\n  .map(r => String(r.json.publisher_id));\n\nconst alreadySaved = existing.includes(String(incoming.publisher_id));\n\nreturn [{ json: { ...incoming, already_saved: alreadySaved } }];"
+      },
+      "id": "n9b_calc",
+      "name": "Calculate Duplicate Flag",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5260, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond_already_saved",
+              "leftValue": "={{ $json.already_saved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n9b",
+      "name": "IF: Publisher Already Saved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [5460, 240]
+    },
+    {
+      "parameters": {
+        "content": "TRUE → skip duplicate.\nFALSE → append to Publishers tab.",
+        "height": 90,
+        "width": 240,
+        "color": 6
+      },
+      "id": "sticky_n9b",
+      "name": "Sticky — IF Already Saved",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [5440, 380]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Publishers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "contact_name": "={{ $json.contact_name }}",
+            "email": "={{ $json.email }}",
+            "email_source": "={{ $json.email_source }}",
+            "email_confidence": "={{ $json.email_confidence }}",
+            "phone": "={{ $json.phone }}",
+            "website": "={{ $json.website }}",
+            "domain": "={{ $json.domain }}",
+            "promo_type": "={{ $json.promo_type }}",
+            "region": "={{ $json.region }}",
+            "clicks": "={{ $json.clicks }}",
+            "impressions": "={{ $json.impressions }}",
+            "transactions": "={{ $json.transactions }}",
+            "commission": "={{ $json.commission }}",
+            "status": "={{ $json.status }}",
+            "date_scraped": "={{ $json.date_scraped }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "n9c",
+      "name": "Save Publisher to Master Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [5660, 320],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "### Section 10 — Rate-limit error handler\nDangling utility nodes — wire from any HTTP node's error output.",
+        "height": 380,
+        "width": 760,
+        "color": 5
+      },
+      "id": "sticky_s10",
+      "name": "Sticky — Section 10",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-400, 800]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst attempt = staticData.retryAttempt || 1;\nconst baseDelay = 3000;\nconst maxDelay = 60000;\nconst jitter = Math.random() * 1000;\nconst delay = Math.min(baseDelay * Math.pow(2, attempt - 1) + jitter, maxDelay);\nstaticData.retryAttempt = attempt + 1;\nreturn [{ json: { ...$json, delay_ms: Math.round(delay), attempt } }];"
+      },
+      "id": "n10a",
+      "name": "Calculate Exponential Backoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-320, 940]
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.round(($json.delay_ms || 3000) / 1000) }}",
+        "unit": "seconds"
+      },
+      "id": "n10b",
+      "name": "Wait — Exponential Backoff",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-100, 940],
+      "webhookId": "wait-exp-backoff"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Rate Limit Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "node_name": "={{ $execution.lastNodeExecuted || '' }}",
+            "domain": "={{ $json.domain || '' }}",
+            "error_code": 429,
+            "retry_count": "={{ $json.attempt || 1 }}",
+            "resolution": "retrying"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "n10c",
+      "name": "Log Rate Limit Error",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [120, 940],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_OAUTH_ID",
+          "name": "GOOGLE_SHEETS_OAUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Daily Trigger — 09:00 AM UTC": {
+      "main": [[{ "node": "Generate Date Range", "type": "main", "index": 0 }]]
+    },
+    "Manual Trigger — On Demand": {
+      "main": [[{ "node": "Generate Date Range", "type": "main", "index": 0 }]]
+    },
+    "Generate Date Range": {
+      "main": [[{ "node": "Check Hunter Budget", "type": "main", "index": 0 }]]
+    },
+    "Check Hunter Budget": {
+      "main": [[{ "node": "AWIN — Get All Publishers", "type": "main", "index": 0 }]]
+    },
+    "AWIN — Get All Publishers": {
+      "main": [[{ "node": "Wait 3s — After AWIN Publishers", "type": "main", "index": 0 }]]
+    },
+    "Wait 3s — After AWIN Publishers": {
+      "main": [[
+        { "node": "AWIN — Get Publisher Performance", "type": "main", "index": 0 },
+        { "node": "Merge Publisher List + Performance Data", "type": "main", "index": 0 }
+      ]]
+    },
+    "AWIN — Get Publisher Performance": {
+      "main": [[{ "node": "Wait 3s — After AWIN Performance", "type": "main", "index": 0 }]]
+    },
+    "Wait 3s — After AWIN Performance": {
+      "main": [[{ "node": "Merge Publisher List + Performance Data", "type": "main", "index": 1 }]]
+    },
+    "Merge Publisher List + Performance Data": {
+      "main": [[{ "node": "Batch Publishers — 5 at a Time", "type": "main", "index": 0 }]]
+    },
+    "Batch Publishers — 5 at a Time": {
+      "main": [
+        [],
+        [{ "node": "Wait 500ms — Inter-Batch", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait 500ms — Inter-Batch": {
+      "main": [[{ "node": "AWIN UI — Scrape Publisher Profile Page", "type": "main", "index": 0 }]]
+    },
+    "AWIN UI — Scrape Publisher Profile Page": {
+      "main": [[{ "node": "Wait 4s — After Profile Scrape", "type": "main", "index": 0 }]]
+    },
+    "Wait 4s — After Profile Scrape": {
+      "main": [[{ "node": "Parse Publisher Profile HTML", "type": "main", "index": 0 }]]
+    },
+    "Parse Publisher Profile HTML": {
+      "main": [[{ "node": "IF: Got Email from AWIN Profile?", "type": "main", "index": 0 }]]
+    },
+    "IF: Got Email from AWIN Profile?": {
+      "main": [
+        [{ "node": "Build Final Enriched Publisher Record", "type": "main", "index": 0 }],
+        [{ "node": "Extract Clean Domain", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Clean Domain": {
+      "main": [[{ "node": "IF: Valid Domain to Search in Hunter?", "type": "main", "index": 0 }]]
+    },
+    "IF: Valid Domain to Search in Hunter?": {
+      "main": [
+        [{ "node": "Wait 5s — Pre Hunter", "type": "main", "index": 0 }],
+        [{ "node": "Log Skipped — No Valid Domain", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Skipped — No Valid Domain": {
+      "main": [[{ "node": "Batch Publishers — 5 at a Time", "type": "main", "index": 0 }]]
+    },
+    "Wait 5s — Pre Hunter": {
+      "main": [[{ "node": "Hunter.io — Domain Search", "type": "main", "index": 0 }]]
+    },
+    "Hunter.io — Domain Search": {
+      "main": [[{ "node": "Wait 2s — Post Hunter", "type": "main", "index": 0 }]]
+    },
+    "Wait 2s — Post Hunter": {
+      "main": [[{ "node": "Extract Best Hunter.io Email Result", "type": "main", "index": 0 }]]
+    },
+    "Extract Best Hunter.io Email Result": {
+      "main": [[{ "node": "Increment Hunter Usage Counter", "type": "main", "index": 0 }]]
+    },
+    "Increment Hunter Usage Counter": {
+      "main": [[{ "node": "Build Final Enriched Publisher Record", "type": "main", "index": 0 }]]
+    },
+    "Build Final Enriched Publisher Record": {
+      "main": [[{ "node": "Read Existing Publisher IDs from Sheet", "type": "main", "index": 0 }]]
+    },
+    "Read Existing Publisher IDs from Sheet": {
+      "main": [[{ "node": "Calculate Duplicate Flag", "type": "main", "index": 0 }]]
+    },
+    "Calculate Duplicate Flag": {
+      "main": [[{ "node": "IF: Publisher Already Saved?", "type": "main", "index": 0 }]]
+    },
+    "IF: Publisher Already Saved?": {
+      "main": [
+        [{ "node": "Batch Publishers — 5 at a Time", "type": "main", "index": 0 }],
+        [{ "node": "Save Publisher to Master Tab", "type": "main", "index": 0 }]
+      ]
+    },
+    "Save Publisher to Master Tab": {
+      "main": [[{ "node": "Batch Publishers — 5 at a Time", "type": "main", "index": 0 }]]
+    },
+    "Calculate Exponential Backoff": {
+      "main": [[{ "node": "Wait — Exponential Backoff", "type": "main", "index": 0 }]]
+    },
+    "Wait — Exponential Backoff": {
+      "main": [[{ "node": "Log Rate Limit Error", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "timezone": "UTC"
+  },
+  "staticData": null,
+  "pinData": {},
+  "tags": [
+    { "name": "green-roads" },
+    { "name": "awin" },
+    { "name": "daily" }
+  ],
+  "active": false,
+  "versionId": "",
+  "id": "",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:8787",
+      "localStorage": [
+        {
+          "name": "bp_dash_session",
+          "value": "{\"username\":\"admin\",\"expires\":9999999999999}"
+        }
+      ]
+    }
+  ]
+}

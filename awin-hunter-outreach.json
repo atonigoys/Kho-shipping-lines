@@ -1,0 +1,299 @@
+{
+  "name": "AWIN + Hunter.io Outreach Automation",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "hours", "hoursInterval": 24, "triggerAtHour": 9 }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2",
+      "name": "AWIN - Get Publishers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.awin.com/advertisers/{{ $env.AWIN_ADVERTISER_ID }}/reports/publisher",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "startDate", "value": "={{ $now.minus({ days: 7 }).toFormat('yyyy-MM-dd') }}" },
+            { "name": "endDate", "value": "={{ $now.toFormat('yyyy-MM-dd') }}" },
+            { "name": "timezone", "value": "UTC" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.AWIN_API_KEY }}" }
+          ]
+        },
+        "options": {},
+        "onError": "continueRegularOutput",
+        "retryOnFail": true
+      }
+    },
+    {
+      "id": "3",
+      "name": "Split Publishers",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 300],
+      "parameters": { "batchSize": 1, "options": {} }
+    },
+    {
+      "id": "4",
+      "name": "IF Clicks > 100",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.clicks }}",
+              "rightValue": 100,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "5",
+      "name": "Set Domain",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1120, 200],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "publisher_name", "value": "={{ $json.publisherName || $json.name }}", "type": "string" },
+            { "id": "a2", "name": "domain", "value": "={{ ($json.website || $json.domain || '').replace(/^https?:\\/\\//,'').replace(/^www\\./,'').split('/')[0] }}", "type": "string" },
+            { "id": "a3", "name": "clicks", "value": "={{ $json.clicks }}", "type": "number" },
+            { "id": "a4", "name": "commission", "value": "={{ $json.commission || 0 }}", "type": "number" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6",
+      "name": "Hunter.io Domain Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.hunter.io/v2/domain-search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "domain", "value": "={{ $json.domain }}" },
+            { "name": "api_key", "value": "={{ $env.HUNTER_API_KEY }}" },
+            { "name": "limit", "value": "5" }
+          ]
+        },
+        "options": {},
+        "onError": "continueRegularOutput",
+        "retryOnFail": true
+      }
+    },
+    {
+      "id": "7",
+      "name": "Extract Best Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1560, 200],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "b1", "name": "publisher_name", "value": "={{ $('Set Domain').item.json.publisher_name }}", "type": "string" },
+            { "id": "b2", "name": "clicks", "value": "={{ $('Set Domain').item.json.clicks }}", "type": "number" },
+            { "id": "b3", "name": "domain", "value": "={{ $('Set Domain').item.json.domain }}", "type": "string" },
+            { "id": "b4", "name": "email", "value": "={{ ($json.data && $json.data.emails && $json.data.emails[0]) ? $json.data.emails[0].value : '' }}", "type": "string" },
+            { "id": "b5", "name": "first_name", "value": "={{ ($json.data && $json.data.emails && $json.data.emails[0]) ? ($json.data.emails[0].first_name || '') : '' }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8",
+      "name": "IF Email Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1780, 200],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "e1",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9",
+      "name": "OpenAI - Generate Outreach",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.OPENAI_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"messages\": [\n    {\"role\": \"system\", \"content\": \"You write short, friendly, professional affiliate-partnership outreach emails. Output ONLY the email body in plain text — no subject line, no preamble. Sign off with [Your Name].\"},\n    {\"role\": \"user\", \"content\": \"Write a short outreach email to {{ $json.first_name || $json.publisher_name }} at {{ $json.publisher_name }} ({{ $json.domain }}). They've driven {{ $json.clicks }} clicks for us recently. Offer to discuss a partnership and a higher commission tier. Keep under 120 words.\"}\n  ]\n}",
+        "options": {},
+        "onError": "continueRegularOutput",
+        "retryOnFail": true
+      }
+    },
+    {
+      "id": "10",
+      "name": "Merge Email Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2220, 100],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "m1", "name": "email", "value": "={{ $('Extract Best Email').item.json.email }}", "type": "string" },
+            { "id": "m2", "name": "publisher_name", "value": "={{ $('Extract Best Email').item.json.publisher_name }}", "type": "string" },
+            { "id": "m3", "name": "clicks", "value": "={{ $('Extract Best Email').item.json.clicks }}", "type": "number" },
+            { "id": "m4", "name": "message", "value": "={{ $json.choices[0].message.content }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "11",
+      "name": "Gmail - Send Outreach",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2440, 100],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email }}",
+        "subject": "Affiliate Partnership Opportunity",
+        "emailType": "text",
+        "message": "={{ $json.message }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "12",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2660, 100],
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "YOUR_SHEET_ID", "mode": "id", "cachedResultName": "Outreach Log" },
+        "sheetName": { "__rl": true, "value": "Sheet1", "mode": "name", "cachedResultName": "Sheet1" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publisher_name": "={{ $json.publisher_name }}",
+            "email": "={{ $json.email }}",
+            "clicks": "={{ $json.clicks }}",
+            "status": "sent",
+            "date_sent": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "13",
+      "name": "Wait 3 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2880, 100],
+      "parameters": { "amount": 3, "unit": "days" }
+    },
+    {
+      "id": "14",
+      "name": "Gmail - Follow Up",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [3100, 100],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email }}",
+        "subject": "Following up — Affiliate Partnership",
+        "emailType": "text",
+        "message": "=Hi {{ $json.publisher_name }},\n\nJust wanted to bump my previous note in case it got buried. Would love to chat about a partnership and a higher commission tier given your performance ({{ $json.clicks }} clicks recently).\n\nOpen to a quick call this week?\n\nBest,\n[Your Name]",
+        "options": {}
+      }
+    },
+    {
+      "id": "15",
+      "name": "Loop Back",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 420],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "AWIN - Get Publishers", "type": "main", "index": 0 }]] },
+    "AWIN - Get Publishers": { "main": [[{ "node": "Split Publishers", "type": "main", "index": 0 }]] },
+    "Split Publishers": { "main": [[{ "node": "IF Clicks > 100", "type": "main", "index": 0 }]] },
+    "IF Clicks > 100": {
+      "main": [
+        [{ "node": "Set Domain", "type": "main", "index": 0 }],
+        [{ "node": "Loop Back", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set Domain": { "main": [[{ "node": "Hunter.io Domain Search", "type": "main", "index": 0 }]] },
+    "Hunter.io Domain Search": { "main": [[{ "node": "Extract Best Email", "type": "main", "index": 0 }]] },
+    "Extract Best Email": { "main": [[{ "node": "IF Email Found", "type": "main", "index": 0 }]] },
+    "IF Email Found": {
+      "main": [
+        [{ "node": "OpenAI - Generate Outreach", "type": "main", "index": 0 }],
+        [{ "node": "Loop Back", "type": "main", "index": 0 }]
+      ]
+    },
+    "OpenAI - Generate Outreach": { "main": [[{ "node": "Merge Email Data", "type": "main", "index": 0 }]] },
+    "Merge Email Data": { "main": [[{ "node": "Gmail - Send Outreach", "type": "main", "index": 0 }]] },
+    "Gmail - Send Outreach": { "main": [[{ "node": "Log to Google Sheets", "type": "main", "index": 0 }]] },
+    "Log to Google Sheets": { "main": [[{ "node": "Wait 3 Days", "type": "main", "index": 0 }]] },
+    "Wait 3 Days": { "main": [[{ "node": "Gmail - Follow Up", "type": "main", "index": 0 }]] },
+    "Gmail - Follow Up": { "main": [[{ "node": "Loop Back", "type": "main", "index": 0 }]] },
+    "Loop Back": { "main": [[{ "node": "Split Publishers", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

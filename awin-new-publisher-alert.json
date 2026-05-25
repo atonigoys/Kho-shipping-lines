@@ -1,0 +1,490 @@
+{
+  "name": "AWIN - New Publisher Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AWIN New Publisher Alert\n\nPolls the AWIN API every 2 hours for pending publisher applications and sends a Gmail alert when new ones are found.\n\n**Required Variables ($vars):**\n- `AWIN_API_KEY`\n- `AWIN_ADVERTISER_ID`\n- `ALERT_EMAIL_TO`\n- `ALERT_EMAIL_FROM`\n- `GOOGLE_SHEET_ID` (optional)\n\n**Required Credentials:**\n- Gmail OAuth2\n- Google Sheets OAuth2\n- (HTTP uses Header Auth via $vars)",
+        "height": 320,
+        "width": 420,
+        "color": 4
+      },
+      "id": "sticky-overview",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, -360]
+    },
+    {
+      "parameters": {
+        "content": "### 1. Triggers\n\n- **Schedule Trigger** runs the workflow every 2 hours.\n- **Manual Trigger** is provided for testing without waiting for the cron.",
+        "height": 220,
+        "width": 320,
+        "color": 5
+      },
+      "id": "sticky-triggers",
+      "name": "Sticky Note - Triggers",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [260, -360]
+    },
+    {
+      "parameters": {
+        "content": "### 2. Fetch & Filter\n\n- **HTTP Request** calls AWIN with `relationshipStatus=pending`.\n- **Filter Already Notified** removes publishers we have already alerted on (deduplication via Workflow Static Data).",
+        "height": 220,
+        "width": 380,
+        "color": 5
+      },
+      "id": "sticky-fetch",
+      "name": "Sticky Note - Fetch & Filter",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [620, -360]
+    },
+    {
+      "parameters": {
+        "content": "### 3. Notify\n\n- **IF** stops the workflow when there are no new publishers.\n- **Format Email Body** builds the HTML and the dynamic subject line.\n- **Gmail** sends the alert.",
+        "height": 220,
+        "width": 380,
+        "color": 5
+      },
+      "id": "sticky-notify",
+      "name": "Sticky Note - Notify",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1340, -360]
+    },
+    {
+      "parameters": {
+        "content": "### 4. Persist\n\n- **Update Notified IDs** writes the new IDs to Workflow Static Data so they will not be alerted again.\n- **Google Sheets** appends a row per new publisher to the tracking sheet.",
+        "height": 220,
+        "width": 380,
+        "color": 5
+      },
+      "id": "sticky-persist",
+      "name": "Sticky Note - Persist",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2060, -360]
+    },
+    {
+      "parameters": {
+        "content": "### Error Handling\n\nAttach this workflow as the **Error Workflow** in Settings, or rely on the inline **Error Trigger** below. The Gmail node sends a one-line failure alert with the error message.",
+        "height": 220,
+        "width": 420,
+        "color": 3
+      },
+      "id": "sticky-error",
+      "name": "Sticky Note - Error Handling",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [620, 520]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger (every 2h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [300, -160],
+      "notes": "Fires every 2 hours to poll AWIN."
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger (testing)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [300, 40],
+      "notes": "Use this trigger to test the workflow without waiting for the schedule."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.awin.com/advertisers/{{ $vars.AWIN_ADVERTISER_ID }}/publishers/",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "relationshipStatus",
+              "value": "pending"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.AWIN_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "http-fetch-publishers",
+      "name": "Fetch Pending Publishers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, -60],
+      "notes": "GET AWIN pending publishers. Auth via header using $vars.AWIN_API_KEY."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter Already Notified Publishers\n// Compares incoming pending publishers against the IDs we've already alerted on,\n// which are persisted in this workflow's static data.\n\nconst staticData = $getWorkflowStaticData('global');\nif (!Array.isArray(staticData.notifiedPublisherIds)) {\n  staticData.notifiedPublisherIds = [];\n}\nconst notified = new Set(staticData.notifiedPublisherIds.map(String));\n\n// AWIN returns either an array directly or an object with a publishers field.\n// Normalize both shapes into a flat array of publisher objects.\nconst incoming = [];\nfor (const item of $input.all()) {\n  const payload = item.json;\n  if (Array.isArray(payload)) {\n    incoming.push(...payload);\n  } else if (Array.isArray(payload?.publishers)) {\n    incoming.push(...payload.publishers);\n  } else if (payload && typeof payload === 'object' && payload.id) {\n    incoming.push(payload);\n  }\n}\n\nconst seenThisRun = new Set();\nconst newPublishers = incoming.filter((p) => {\n  const id = String(p?.id ?? p?.publisherId ?? '');\n  if (!id) return false;\n  if (notified.has(id)) return false;\n  if (seenThisRun.has(id)) return false;\n  seenThisRun.add(id);\n  return true;\n});\n\nreturn [\n  {\n    json: {\n      count: newPublishers.length,\n      newPublishers,\n      alreadyNotifiedCount: notified.size,\n    },\n  },\n];\n"
+      },
+      "id": "code-filter",
+      "name": "Filter Already Notified",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, -60],
+      "notes": "Removes publishers whose IDs are already in workflow static data."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-new-condition",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-new",
+      "name": "Has New Publishers?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1300, -60],
+      "notes": "TRUE if at least one new publisher; FALSE stops the workflow."
+    },
+    {
+      "parameters": {},
+      "id": "noop-no-new",
+      "name": "No New Publishers (Stop)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1620, 100],
+      "notes": "Terminates the run when nothing new was returned by AWIN."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format Email Body\n// Builds a clean HTML email body and a dynamic subject line\n// summarizing the new pending publishers.\n\nconst input = $input.first().json;\nconst publishers = Array.isArray(input.newPublishers) ? input.newPublishers : [];\nconst count = publishers.length;\n\nconst escapeHtml = (value) =>\n  String(value ?? '')\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;')\n    .replace(/'/g, '&#39;');\n\nconst formatDate = (value) => {\n  if (!value) return '—';\n  const d = new Date(value);\n  if (Number.isNaN(d.getTime())) return escapeHtml(value);\n  return d.toISOString().slice(0, 10);\n};\n\nconst rows = publishers\n  .map((p) => {\n    const id = escapeHtml(p.id ?? p.publisherId ?? '');\n    const name = escapeHtml(p.name ?? p.publisherName ?? 'Unknown');\n    const country = escapeHtml(p.country ?? p.primaryRegion?.countryCode ?? '—');\n    const joined = formatDate(p.joinDate ?? p.applicationDate ?? p.dateJoined ?? p.createdDate);\n    return `\n      <tr>\n        <td style=\"padding:10px;border-bottom:1px solid #eee;\">${id}</td>\n        <td style=\"padding:10px;border-bottom:1px solid #eee;\">${name}</td>\n        <td style=\"padding:10px;border-bottom:1px solid #eee;\">${country}</td>\n        <td style=\"padding:10px;border-bottom:1px solid #eee;\">${joined}</td>\n      </tr>`;\n  })\n  .join('');\n\nconst subject = `🔔 [AWIN] ${count} New Publisher(s) Pending Approval`;\n\nconst htmlBody = `<!DOCTYPE html>\n<html>\n  <body style=\"margin:0;padding:0;background:#f6f8fa;font-family:Arial,Helvetica,sans-serif;color:#333;\">\n    <div style=\"max-width:600px;margin:0 auto;padding:24px;background:#ffffff;\">\n      <h2 style=\"color:#333;margin:0 0 16px 0;\">🔔 ${count} new publisher(s) pending approval on AWIN</h2>\n      <p style=\"color:#333;margin:0 0 16px 0;\">The following publishers have applied to your AWIN program and are awaiting review:</p>\n      <table role=\"presentation\" style=\"width:100%;border-collapse:collapse;font-size:14px;color:#333;\">\n        <thead>\n          <tr style=\"background:#f0f4f8;\">\n            <th align=\"left\" style=\"padding:10px;border-bottom:2px solid #ddd;\">Publisher ID</th>\n            <th align=\"left\" style=\"padding:10px;border-bottom:2px solid #ddd;\">Name</th>\n            <th align=\"left\" style=\"padding:10px;border-bottom:2px solid #ddd;\">Country</th>\n            <th align=\"left\" style=\"padding:10px;border-bottom:2px solid #ddd;\">Applied</th>\n          </tr>\n        </thead>\n        <tbody>${rows}</tbody>\n      </table>\n      <p style=\"margin:24px 0 0 0;\">\n        <a href=\"https://ui.awin.com\" style=\"color:#0073e6;text-decoration:none;font-weight:bold;\">Open AWIN Dashboard →</a>\n      </p>\n      <p style=\"color:#888;font-size:12px;margin-top:32px;\">Automated alert from your n8n AWIN workflow.</p>\n    </div>\n  </body>\n</html>`;\n\nreturn [\n  {\n    json: {\n      subject,\n      htmlBody,\n      count,\n      newPublishers: publishers,\n    },\n  },\n];\n"
+      },
+      "id": "code-format-email",
+      "name": "Format Email Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1620, -160],
+      "notes": "Builds htmlBody and subject. Escapes user-provided fields to prevent HTML injection."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $vars.ALERT_EMAIL_TO }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.htmlBody }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "={{ $vars.ALERT_EMAIL_FROM }}"
+        }
+      },
+      "id": "gmail-send-alert",
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1940, -160],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-oauth-cred",
+          "name": "Gmail OAuth2 - AWIN Alerts"
+        }
+      },
+      "notes": "Sends the formatted HTML alert. Replace credential reference on import.",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update Notified Publisher IDs\n// Persists the IDs we just alerted on into workflow static data\n// so future runs do not re-alert for the same publishers.\n\nconst payload = $input.first().json;\nconst newPublishers = Array.isArray(payload.newPublishers) ? payload.newPublishers : [];\n\nconst staticData = $getWorkflowStaticData('global');\nif (!Array.isArray(staticData.notifiedPublisherIds)) {\n  staticData.notifiedPublisherIds = [];\n}\n\nconst existing = new Set(staticData.notifiedPublisherIds.map(String));\nconst addedIds = [];\n\nfor (const p of newPublishers) {\n  const id = String(p?.id ?? p?.publisherId ?? '');\n  if (!id || existing.has(id)) continue;\n  existing.add(id);\n  addedIds.push(id);\n}\n\nstaticData.notifiedPublisherIds = Array.from(existing);\nstaticData.lastNotifiedAt = new Date().toISOString();\n\nreturn [\n  {\n    json: {\n      addedIds,\n      addedCount: addedIds.length,\n      totalNotified: staticData.notifiedPublisherIds.length,\n      lastNotifiedAt: staticData.lastNotifiedAt,\n      newPublishers,\n    },\n  },\n];\n"
+      },
+      "id": "code-update-notified",
+      "name": "Update Notified IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2260, -160],
+      "notes": "Persists alerted publisher IDs to workflow static data."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expand the new-publisher list into one item per publisher\n// so the Google Sheets node can append a row for each.\n\nconst payload = $input.first().json;\nconst publishers = Array.isArray(payload.newPublishers) ? payload.newPublishers : [];\nconst notifiedAt = payload.lastNotifiedAt || new Date().toISOString();\n\nreturn publishers.map((p) => ({\n  json: {\n    publisherId: String(p?.id ?? p?.publisherId ?? ''),\n    name: p?.name ?? p?.publisherName ?? '',\n    country: p?.country ?? p?.primaryRegion?.countryCode ?? '',\n    status: p?.relationship ?? p?.relationshipStatus ?? 'pending',\n    notifiedAt,\n  },\n}));\n"
+      },
+      "id": "code-expand-rows",
+      "name": "Expand for Sheets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2580, -160],
+      "notes": "Splits the batch into one item per publisher so Google Sheets appends one row each."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Publishers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Publisher ID": "={{ $json.publisherId }}",
+            "Name": "={{ $json.name }}",
+            "Country": "={{ $json.country }}",
+            "Status": "={{ $json.status }}",
+            "Notified At": "={{ $json.notifiedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Publisher ID", "displayName": "Publisher ID", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Name", "displayName": "Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Country", "displayName": "Country", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Status", "displayName": "Status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Notified At", "displayName": "Notified At", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sheets-log",
+      "name": "Log New Publishers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2900, -160],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-cred",
+          "name": "Google Sheets OAuth2"
+        }
+      },
+      "notes": "Appends one row per new publisher. Sheet must have a header row with the named columns.",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Workflow Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [660, 720],
+      "notes": "Fires when this workflow is set as the Error Workflow for another (or itself in Settings)."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $vars.ALERT_EMAIL_TO }}",
+        "subject": "⚠️ AWIN Workflow Error",
+        "emailType": "text",
+        "message": "=The AWIN Publisher Alert workflow failed with error: {{ $json.execution?.error?.message || $json.message || 'Unknown error' }}\n\nNode: {{ $json.execution?.error?.node?.name || 'n/a' }}\nWorkflow: {{ $json.workflow?.name || 'AWIN - New Publisher Alert' }}\nExecution: {{ $json.execution?.id || 'n/a' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "gmail-error-alert",
+      "name": "Send Error Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [980, 720],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-oauth-cred",
+          "name": "Gmail OAuth2 - AWIN Alerts"
+        }
+      },
+      "notes": "Sends a plain-text failure notification with the underlying error message."
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (every 2h)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Pending Publishers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger (testing)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Pending Publishers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Pending Publishers": {
+      "main": [
+        [
+          {
+            "node": "Filter Already Notified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Already Notified": {
+      "main": [
+        [
+          {
+            "node": "Has New Publishers?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New Publishers?": {
+      "main": [
+        [
+          {
+            "node": "Format Email Body",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No New Publishers (Stop)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email Body": {
+      "main": [
+        [
+          {
+            "node": "Send Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Alert Email": {
+      "main": [
+        [
+          {
+            "node": "Update Notified IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notified IDs": {
+      "main": [
+        [
+          {
+            "node": "Expand for Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand for Sheets": {
+      "main": [
+        [
+          {
+            "node": "Log New Publishers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log New Publishers": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    { "name": "awin" },
+    { "name": "affiliate" },
+    { "name": "alerts" }
+  ]
+}

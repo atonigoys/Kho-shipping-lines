@@ -1,0 +1,576 @@
+﻿{
+  "name": "AWIN GREEN ROADS - Weekly Publisher Outreach",
+  "nodes": [
+    {
+      "id": "trigger-monday",
+      "name": "Every Monday 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-1600, 0],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "calc-date-range",
+      "name": "Calculate Date Range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1380, 0],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Workflow runs Monday. Compute previous Sun -> Sat window.\nconst trigger = $input.first()?.json ?? {};\nconst now = new Date();\nconst dow = now.getUTCDay(); // 0=Sun ... 6=Sat\n// On Monday (dow=1), previous Sunday is 8 days back; previous Saturday 2 days back.\nconst daysSincePrevSunday = dow === 0 ? 7 : dow + 7;\nconst start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSincePrevSunday));\nconst end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + 6));\n\nconst fmt = d => d.toISOString().slice(0, 10);\nconst sevenDaysAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 7));\n\n// ISO week key: YYYY-Www\nfunction isoWeek(d) {\n  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));\n  const day = t.getUTCDay() || 7;\n  t.setUTCDate(t.getUTCDate() + 4 - day);\n  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));\n  const weekNo = Math.ceil((((t - yearStart) / 86400000) + 1) / 7);\n  return `${t.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;\n}\n\nreturn [{\n  json: {\n    triggeredAt: trigger.timestamp ?? now.toISOString(),\n    startDate: fmt(start),\n    endDate: fmt(end),\n    sevenDaysAgo: fmt(sevenDaysAgo),\n    runDate: fmt(now),\n    weekKey: isoWeek(start),\n    advertiserId: 81733,\n    program: 'GREEN ROADS'\n  }\n}];"
+      }
+    },
+    {
+      "id": "http-performance",
+      "name": "AWIN: Publisher Performance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-1140, -160],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.awin.com/advertisers/{{ $json.advertiserId }}/reports/publisher",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "startDate", "value": "={{ $json.startDate }}" },
+            { "name": "endDate",   "value": "={{ $json.endDate }}" },
+            { "name": "timezone",  "value": "UTC" },
+            { "name": "dateType",  "value": "transaction" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer 990ee5cf-f69e-4950-ae3b-7e0e7f943417" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "http-publishers",
+      "name": "AWIN: Publishers List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-1140, 160],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.awin.com/advertisers/{{ $('Calculate Date Range').item.json.advertiserId }}/publishers",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "relationship", "value": "joined" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer 990ee5cf-f69e-4950-ae3b-7e0e7f943417" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "pagination": {
+            "pagination": {
+              "paginationMode": "responseContainsNextURL",
+              "nextURL": "={{ $response.headers && $response.headers.link ? ($response.headers.link.match(/<([^>]+)>;\\s*rel=\"next\"/) || [])[1] : undefined }}",
+              "limitPagesFetched": true,
+              "maxRequests": 50
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "merge-data",
+      "name": "Merge AWIN Responses",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-880, 0],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      }
+    },
+    {
+      "id": "normalize",
+      "name": "Normalize & Filter GREEN ROADS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-660, 0],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Inputs from merge: item 0 = performance report, item 1 = publishers list.\n// AWIN endpoints can return arrays directly or wrapped â€” handle both.\nfunction asArray(x) {\n  if (!x) return [];\n  if (Array.isArray(x)) return x;\n  if (Array.isArray(x.data)) return x.data;\n  if (Array.isArray(x.items)) return x.items;\n  if (Array.isArray(x.publishers)) return x.publishers;\n  return [];\n}\n\nconst dateCtx = $('Calculate Date Range').item.json;\nconst all = $input.all();\nconst perfRaw = all[0]?.json ?? {};\nconst pubsRaw = all[1]?.json ?? {};\n\nconst performance = asArray(perfRaw);\nconst publishers  = asArray(pubsRaw);\n\n// Build a lookup of publisher metadata (join date, email, name)\nconst pubMap = new Map();\nfor (const p of publishers) {\n  const id = p.id ?? p.publisherId ?? p.publisher?.id;\n  if (id == null) continue;\n  pubMap.set(String(id), {\n    publisher_name: p.name ?? p.publisherName ?? p.publisher?.name ?? '',\n    email: p.email ?? p.contactEmail ?? p.publisher?.email ?? '',\n    join_date: p.joinedDate ?? p.dateJoined ?? p.joinDate ?? p.relationshipDate ?? null\n  });\n}\n\n// Normalize performance rows. Filter to GREEN ROADS commission groups only.\nconst out = [];\nconst seen = new Set();\nfor (const row of performance) {\n  const groupName = (row.commissionGroupName || row.commissionGroup || '').toString();\n  if (groupName && !/green\\s*roads/i.test(groupName)) continue;\n\n  const id = String(row.publisherId ?? row.publisher?.id ?? row.id ?? '');\n  if (!id || seen.has(id)) continue;\n  seen.add(id);\n  const meta = pubMap.get(id) || {};\n\n  out.push({\n    json: {\n      publisher_id: id,\n      publisher_name: row.publisherName ?? row.publisher?.name ?? meta.publisher_name ?? '',\n      email: meta.email ?? row.publisherEmail ?? '',\n      clicks: Number(row.clicks ?? 0),\n      transactions: Number(row.transactionsCount ?? row.transactions ?? 0),\n      revenue: Number(row.totalSaleAmount?.amount ?? row.saleAmount?.amount ?? row.revenue ?? 0),\n      commission: Number(row.totalCommissionAmount?.amount ?? row.commissionAmount?.amount ?? row.commission ?? 0),\n      join_date: meta.join_date,\n      commission_group: groupName,\n      _ctx: dateCtx\n    }\n  });\n}\n\n// Add publishers that joined in the last 7 days but had no perf rows yet\nfor (const [id, meta] of pubMap.entries()) {\n  if (seen.has(id)) continue;\n  if (!meta.join_date) continue;\n  const joined = new Date(meta.join_date);\n  if (Number.isNaN(joined.getTime())) continue;\n  const sevenDaysAgo = new Date(dateCtx.sevenDaysAgo);\n  if (joined < sevenDaysAgo) continue;\n  out.push({\n    json: {\n      publisher_id: id,\n      publisher_name: meta.publisher_name,\n      email: meta.email,\n      clicks: 0,\n      transactions: 0,\n      revenue: 0,\n      commission: 0,\n      join_date: meta.join_date,\n      commission_group: 'GREEN ROADS',\n      _ctx: dateCtx\n    }\n  });\n}\n\nreturn out;"
+      }
+    },
+    {
+      "id": "sheets-already-emailed",
+      "name": "Sheets: Already Emailed This Week",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-440, 0],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GSHEET_ID }}",
+          "cachedResultName": "AWIN GREEN ROADS Outreach DB"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Outreach Logs",
+          "cachedResultName": "Outreach Logs"
+        },
+        "range": "A:N",
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "detectAutomatically",
+              "readRowsUntil": "lastRowInSheet"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_GSHEETS_CRED_ID", "name": "Google Sheets OAuth" }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "categorize",
+      "name": "Categorize + Dedupe",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-220, 0],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// $input has rows from 'Already Emailed This Week'. Pull publishers from the upstream Normalize step.\nconst alreadyRaw = $input.all().map(i => i.json);\nconst alreadySet = new Set(\n  alreadyRaw\n    .map(r => `${r.publisher_id}|${r.email_type || r.category || ''}`)\n    .filter(Boolean)\n);\n\nconst pubs = $('Normalize & Filter GREEN ROADS').all().map(i => i.json);\nconst dateCtx = $('Calculate Date Range').item.json;\nconst sevenDaysAgo = new Date(dateCtx.sevenDaysAgo);\n\nconst out = [];\nfor (const p of pubs) {\n  const categories = [];\n  const joined = p.join_date ? new Date(p.join_date) : null;\n  const isNew = joined && !Number.isNaN(joined.getTime()) && joined >= sevenDaysAgo;\n  const lowClicks = p.clicks < 100 && p.transactions === 0;\n  const lowPerf = p.transactions === 0 || p.revenue < 20;\n\n  if (isNew) categories.push('new_publisher');\n  else if (lowClicks) categories.push('low_clicks');\n  else if (lowPerf) categories.push('low_performance');\n\n  for (const cat of categories) {\n    const dedupeKey = `${p.publisher_id}|${cat}`;\n    if (alreadySet.has(dedupeKey)) continue;\n    out.push({\n      json: {\n        publisher_id: p.publisher_id,\n        publisher_name: p.publisher_name,\n        email: p.email,\n        clicks: p.clicks,\n        transactions: p.transactions,\n        revenue: p.revenue,\n        commission: p.commission,\n        join_date: p.join_date,\n        commission_group: p.commission_group,\n        category: cat,\n        week_key: dateCtx.weekKey,\n        run_date: dateCtx.runDate\n      }\n    });\n  }\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "loop-batches",
+      "name": "Per-Publisher Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [0, 0],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "if-has-email",
+      "name": "Has Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [220, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "leftValue": "",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-email",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "sheets-fallback-contacts",
+      "name": "Sheets: Fallback Contacts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [440, 200],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GSHEET_ID }}",
+          "cachedResultName": "AWIN GREEN ROADS Outreach DB"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Publishers",
+          "cachedResultName": "Publishers"
+        },
+        "range": "A:G",
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "detectAutomatically",
+              "readRowsUntil": "lastRowInSheet"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_GSHEETS_CRED_ID", "name": "Google Sheets OAuth" }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "merge-contact",
+      "name": "Merge Contact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 200],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Find a fallback row matching this publisher_id (Sheets read returns ALL rows here).\nconst pub = $('Per-Publisher Loop').item.json;\nconst rows = $input.all().map(i => i.json);\nconst match = rows.find(r => String(r.publisher_id) === String(pub.publisher_id)) || {};\nconst email = match.email || pub.email || '';\nreturn [{ json: { ...pub, email, _contact_source: email && !pub.email ? 'fallback' : 'awin' } }];"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "build-email",
+      "name": "Build Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nreturn items.map(it => {\n  const p = it.json;\n  const name = p.publisher_name || 'Partner';\n  const LOW_PERF_SUBJECT = \"Let's Improve Your GREEN ROADS Campaign Performance\";\n  const NEW_PUB_SUBJECT  = \"Welcome to GREEN ROADS Affiliate Program\";\n\n  const LOW_PERF_BODY = `Hi ${name},\\n\\nWe noticed your publisher account generated low activity last week.\\n\\nWe'd love to help optimize your placements and improve performance for GREEN ROADS campaigns.\\n\\nLet us know if you need:\\n- updated creatives\\n- landing pages\\n- coupon offers\\n- exclusive promotions\\n\\nLooking forward to working together.\\n\\nBest,\\nGREEN ROADS Affiliate Team`;\n\n  const NEW_PUB_BODY = `Hi ${name},\\n\\nWelcome to the GREEN ROADS affiliate program.\\n\\nWe're excited to work with you.\\n\\nHere are some things we can provide:\\n- top converting creatives\\n- coupon codes\\n- landing pages\\n- custom support\\n\\nReply anytime if you need help getting started.\\n\\nBest,\\nGREEN ROADS Affiliate Team`;\n\n  let subject, body;\n  if (p.category === 'new_publisher') { subject = NEW_PUB_SUBJECT; body = NEW_PUB_BODY; }\n  else { subject = LOW_PERF_SUBJECT; body = LOW_PERF_BODY; }\n\n  return { json: { ...p, email_subject: subject, email_body: body } };\n});"
+      }
+    },
+    {
+      "id": "if-can-send",
+      "name": "Email Resolved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1100, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "leftValue": "",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "email-not-empty",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "gmail-send",
+      "name": "Gmail: Send",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1340, -120],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.email_subject }}",
+        "emailType": "text",
+        "message": "={{ $json.email_body }}",
+        "options": { "appendAttribution": false }
+      },
+      "credentials": {
+        "gmailOAuth2": { "id": "REPLACE_GMAIL_CRED_ID", "name": "Gmail OAuth" }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "log-success",
+      "name": "Log: Outreach Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1560, -120],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GSHEET_ID }}",
+          "cachedResultName": "AWIN GREEN ROADS Outreach DB"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Outreach Logs",
+          "cachedResultName": "Outreach Logs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $json.run_date }}",
+            "week_key": "={{ $json.week_key }}",
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "email": "={{ $json.email }}",
+            "clicks": "={{ $json.clicks }}",
+            "transactions": "={{ $json.transactions }}",
+            "revenue": "={{ $json.revenue }}",
+            "commission": "={{ $json.commission }}",
+            "category": "={{ $json.category }}",
+            "email_type": "={{ $json.category }}",
+            "status": "sent",
+            "email_sent": true,
+            "error": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "date", "displayName": "date", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "week_key", "displayName": "week_key", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "publisher_id", "displayName": "publisher_id", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "publisher_name", "displayName": "publisher_name", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "clicks", "displayName": "clicks", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "number" },
+            { "id": "transactions", "displayName": "transactions", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "number" },
+            { "id": "revenue", "displayName": "revenue", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "number" },
+            { "id": "commission", "displayName": "commission", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "number" },
+            { "id": "category", "displayName": "category", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "email_type", "displayName": "email_type", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "status", "displayName": "status", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "email_sent", "displayName": "email_sent", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "boolean" },
+            { "id": "error", "displayName": "error", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_GSHEETS_CRED_ID", "name": "Google Sheets OAuth" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "log-skipped",
+      "name": "Log: No Email",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1340, 200],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GSHEET_ID }}",
+          "cachedResultName": "AWIN GREEN ROADS Outreach DB"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Outreach Logs",
+          "cachedResultName": "Outreach Logs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $json.run_date }}",
+            "week_key": "={{ $json.week_key }}",
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "email": "",
+            "clicks": "={{ $json.clicks }}",
+            "transactions": "={{ $json.transactions }}",
+            "revenue": "={{ $json.revenue }}",
+            "commission": "={{ $json.commission }}",
+            "category": "={{ $json.category }}",
+            "email_type": "={{ $json.category }}",
+            "status": "skipped_no_email",
+            "email_sent": false,
+            "error": "no email available"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "date", "displayName": "date", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "week_key", "displayName": "week_key", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "publisher_id", "displayName": "publisher_id", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "publisher_name", "displayName": "publisher_name", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "clicks", "displayName": "clicks", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "number" },
+            { "id": "transactions", "displayName": "transactions", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "number" },
+            { "id": "revenue", "displayName": "revenue", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "number" },
+            { "id": "commission", "displayName": "commission", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "number" },
+            { "id": "category", "displayName": "category", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "email_type", "displayName": "email_type", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "status", "displayName": "status", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "email_sent", "displayName": "email_sent", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "boolean" },
+            { "id": "error", "displayName": "error", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_GSHEETS_CRED_ID", "name": "Google Sheets OAuth" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "log-new-pub-tab",
+      "name": "Log: New Publishers Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1560, 60],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GSHEET_ID }}",
+          "cachedResultName": "AWIN GREEN ROADS Outreach DB"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "New Publishers",
+          "cachedResultName": "New Publishers"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publisher_id": "={{ $json.publisher_id }}",
+            "publisher_name": "={{ $json.publisher_name }}",
+            "email": "={{ $json.email }}",
+            "join_date": "={{ $json.join_date }}",
+            "first_seen": "={{ $json.run_date }}",
+            "welcome_email_sent": "={{ $json.category === 'new_publisher' }}"
+          },
+          "matchingColumns": ["publisher_id"],
+          "schema": [
+            { "id": "publisher_id", "displayName": "publisher_id", "required": true, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "publisher_name", "displayName": "publisher_name", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": false, "type": "string" },
+            { "id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": false, "type": "string" },
+            { "id": "join_date", "displayName": "join_date", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": false, "type": "string" },
+            { "id": "first_seen", "displayName": "first_seen", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": false, "type": "string" },
+            { "id": "welcome_email_sent", "displayName": "welcome_email_sent", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": false, "type": "boolean" }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_GSHEETS_CRED_ID", "name": "Google Sheets OAuth" }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Every Monday 9 AM": {
+      "main": [[{ "node": "Calculate Date Range", "type": "main", "index": 0 }]]
+    },
+    "Calculate Date Range": {
+      "main": [[
+        { "node": "AWIN: Publisher Performance", "type": "main", "index": 0 },
+        { "node": "AWIN: Publishers List", "type": "main", "index": 0 }
+      ]]
+    },
+    "AWIN: Publisher Performance": {
+      "main": [[{ "node": "Merge AWIN Responses", "type": "main", "index": 0 }]]
+    },
+    "AWIN: Publishers List": {
+      "main": [[{ "node": "Merge AWIN Responses", "type": "main", "index": 1 }]]
+    },
+    "Merge AWIN Responses": {
+      "main": [[{ "node": "Normalize & Filter GREEN ROADS", "type": "main", "index": 0 }]]
+    },
+    "Normalize & Filter GREEN ROADS": {
+      "main": [[{ "node": "Sheets: Already Emailed This Week", "type": "main", "index": 0 }]]
+    },
+    "Sheets: Already Emailed This Week": {
+      "main": [[{ "node": "Categorize + Dedupe", "type": "main", "index": 0 }]]
+    },
+    "Categorize + Dedupe": {
+      "main": [[{ "node": "Per-Publisher Loop", "type": "main", "index": 0 }]]
+    },
+    "Per-Publisher Loop": {
+      "main": [
+        [],
+        [{ "node": "Has Email?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Email?": {
+      "main": [
+        [{ "node": "Build Email", "type": "main", "index": 0 }],
+        [{ "node": "Sheets: Fallback Contacts", "type": "main", "index": 0 }]
+      ]
+    },
+    "Sheets: Fallback Contacts": {
+      "main": [[{ "node": "Merge Contact", "type": "main", "index": 0 }]]
+    },
+    "Merge Contact": {
+      "main": [[{ "node": "Build Email", "type": "main", "index": 0 }]]
+    },
+    "Build Email": {
+      "main": [[{ "node": "Email Resolved?", "type": "main", "index": 0 }]]
+    },
+    "Email Resolved?": {
+      "main": [
+        [{ "node": "Gmail: Send", "type": "main", "index": 0 }],
+        [{ "node": "Log: No Email", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gmail: Send": {
+      "main": [[
+        { "node": "Log: Outreach Sent", "type": "main", "index": 0 },
+        { "node": "Log: New Publishers Tab", "type": "main", "index": 0 }
+      ]]
+    },
+    "Log: Outreach Sent": {
+      "main": [[{ "node": "Per-Publisher Loop", "type": "main", "index": 0 }]]
+    },
+    "Log: New Publishers Tab": {
+      "main": [[]]
+    },
+    "Log: No Email": {
+      "main": [[{ "node": "Per-Publisher Loop", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  }
+}
+
