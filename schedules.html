@@ -12,6 +12,7 @@
     --red:        #c8102e;
     --red-dark:   #9a0c23;
     --red-soft:   #ffe8eb;
+    --red-accent: #ff6b7a;
     --white:      #ffffff;
     --ink:        #1a1a1a;
     --ink-soft:   #4a4a4a;
@@ -19,68 +20,156 @@
     --line:       #ececec;
     --bg-soft:    #f5f6f7;
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     color: var(--ink);
-    background: var(--bg-soft);
+    background: var(--white);
     line-height: 1.55;
+    overflow-x: hidden;
   }
 
-  /* HEADER */
+  /* =================== HEADER BAR =================== */
   .header-bar {
     background: var(--white);
     box-shadow: 0 2px 18px rgba(0,0,0,0.08);
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 100;
   }
   .nav {
-    max-width: 1200px;
+    max-width: 1265px;
     margin: 0 auto;
     padding: 12px 31px;
     display: flex;
     align-items: center;
-    gap: 18px;
+    justify-content: space-between;
+    gap: 24px;
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 18px;
     text-decoration: none;
   }
   .brand-mark {
-    width: 64px;
-    height: 64px;
+    width: 84px;
+    height: 84px;
     border-radius: 50%;
     background: var(--white);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    color: var(--red);
+    display: grid;
+    place-items: center;
+    border: 0;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.20);
+    transition: transform .25s ease;
     overflow: hidden;
-    flex-shrink: 0;
   }
-  .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
+  .brand:hover .brand-mark { transform: rotate(-8deg) scale(1.05); }
+  .brand-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
   .brand-text {
     color: var(--red);
     font-weight: 900;
-    font-size: 36px;
+    font-size: 52px;
+    letter-spacing: 0;
     line-height: 1;
     font-family: 'Inter', sans-serif;
   }
   .brand-text small {
     display: block;
-    font-size: 11px;
+    font-size: 14px;
     font-weight: 700;
-    letter-spacing: 3px;
+    letter-spacing: 4px;
+    opacity: 1;
     text-transform: uppercase;
-    margin-top: 4px;
+    margin-top: 5px;
     color: var(--red);
   }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 42px;
+  }
+  .nav-links a {
+    color: #333;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 16px;
+    transition: color .2s ease;
+    position: relative;
+    padding: 6px 0;
+  }
+  .nav-links a:hover { color: var(--red); }
+  .nav-links a::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 0;
+    height: 2.5px;
+    background: var(--red);
+    border-radius: 2px;
+    transition: width .3s ease, left .3s ease;
+  }
+  .nav-links a:hover::after,
+  .nav-links a.active::after { width: 100%; left: 0; }
+  .nav-links a.active { color: var(--red); }
+  .nav-cta {
+    background: var(--red) !important;
+    color: var(--white) !important;
+    padding: 11px 26px !important;
+    border-radius: 30px;
+    font-weight: 700 !important;
+    box-shadow: 0 8px 20px rgba(200,16,46,0.30);
+    transition: transform .15s ease, background .2s ease !important;
+  }
+  .nav-cta:hover {
+    background: var(--red-dark) !important;
+    color: var(--white) !important;
+    transform: translateY(-2px);
+  }
+  .nav-cta::after { display: none !important; }
+  .burger {
+    display: none;
+    background: var(--red);
+    border: 0;
+    color: var(--white);
+    font-size: 22px;
+    cursor: pointer;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+  }
+  @media (max-width: 1100px) {
+    .nav-links { gap: 26px; }
+    .nav-links a { font-size: 14px; }
+    .brand-text { font-size: 38px; }
+    .brand-text small { font-size: 11px; letter-spacing: 2.5px; }
+    .brand-mark { width: 70px; height: 70px; }
+  }
+  @media (max-width: 900px) {
+    .nav { padding: 10px 16px; }
+    .nav-links { display: none; }
+    .burger { display: grid; place-items: center; }
+    .brand-text { font-size: 28px; }
+    .brand-text small { font-size: 8px; letter-spacing: 1.8px; }
+    .brand-mark { width: 54px; height: 54px; }
+  }
 
-  /* PAGE HERO */
+  /* =================== PAGE HERO =================== */
   .page-hero {
+    margin-top: 108px;
     background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
     color: var(--white);
-    padding: 56px 24px 52px;
+    padding: 60px 24px 56px;
     text-align: center;
     position: relative;
     overflow: hidden;
@@ -95,13 +184,14 @@
     background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%);
     pointer-events: none;
   }
-  .page-hero .eyebrow {
+  .eyebrow {
     font-size: 12px;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 3px;
     opacity: 0.85;
     margin-bottom: 12px;
+    color: inherit;
   }
   .page-hero h1 {
     font-family: 'Playfair Display', serif;
@@ -116,33 +206,38 @@
     max-width: 520px;
     margin-inline: auto;
   }
+  @media (max-width: 900px) {
+    .page-hero { margin-top: 74px; }
+  }
 
-  /* CONTENT */
+  /* =================== CONTENT =================== */
   .content {
     max-width: 960px;
     margin: 0 auto;
     padding: 56px 24px 80px;
+    background: var(--bg-soft);
+    min-height: calc(100vh - 108px);
   }
 
-  /* LEGEND */
+  /* =================== LEGEND =================== */
   .legend {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    margin-bottom: 40px;
+    margin-bottom: 36px;
     background: var(--white);
     border-radius: 12px;
     padding: 18px 22px;
     box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    align-items: center;
   }
   .legend-title {
-    width: 100%;
     font-size: 12px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1.5px;
     color: var(--muted);
-    margin-bottom: 6px;
+    margin-right: 6px;
   }
   .legend-item {
     display: inline-flex;
@@ -157,22 +252,10 @@
     height: 10px;
     border-radius: 50%;
   }
-  .dot-mwf { background: var(--red); }
+  .dot-mwf  { background: var(--red); }
   .dot-tths { background: #1a6fc4; }
 
-  /* SCHEDULE TABLE */
-  .schedule-group {
-    margin-bottom: 40px;
-  }
-  .schedule-group-title {
-    font-size: 13px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: var(--muted);
-    margin-bottom: 14px;
-    padding-left: 4px;
-  }
+  /* =================== TABLE =================== */
   .schedule-table {
     width: 100%;
     border-collapse: collapse;
@@ -180,6 +263,7 @@
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 4px 22px rgba(0,0,0,0.07);
+    margin-bottom: 32px;
   }
   .schedule-table thead tr {
     background: var(--ink);
@@ -211,46 +295,12 @@
     font-weight: 700;
     color: var(--ink);
   }
-  .route-arrow {
-    color: var(--red);
-    font-size: 18px;
-  }
-  .days-badge {
-    display: inline-flex;
-    gap: 5px;
-    flex-wrap: wrap;
-  }
-  .day {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-  }
-  .day.mwf {
-    background: var(--red-soft);
-    color: var(--red);
-  }
-  .day.tths {
-    background: #deeaf8;
-    color: #1a6fc4;
-  }
-  .freq-badge {
-    display: inline-block;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--muted);
-    background: var(--bg-soft);
-    border-radius: 20px;
-    padding: 4px 12px;
-  }
+  .route-arrow { color: var(--red); font-size: 18px; }
 
-  /* DAY CHIPS */
+  /* Day circles */
   .days-row {
     display: flex;
     gap: 6px;
-    flex-wrap: wrap;
   }
   .day-chip {
     width: 34px;
@@ -263,20 +313,29 @@
     border: 2px solid var(--line);
     color: var(--muted);
   }
-  .day-chip.active-mwf {
+  .day-chip.mwf {
     background: var(--red);
     border-color: var(--red);
     color: var(--white);
   }
-  .day-chip.active-tths {
+  .day-chip.tths {
     background: #1a6fc4;
     border-color: #1a6fc4;
     color: var(--white);
   }
 
-  /* NOTE */
+  .freq-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    background: var(--bg-soft);
+    border-radius: 20px;
+    padding: 4px 14px;
+  }
+
+  /* =================== NOTE =================== */
   .schedule-note {
-    margin-top: 32px;
     background: var(--red-soft);
     border: 1px solid rgba(200,16,46,0.18);
     border-radius: 10px;
@@ -287,17 +346,27 @@
   }
   .schedule-note strong { color: var(--red); }
 
+  /* =================== FOOTER =================== */
+  footer {
+    background: var(--ink);
+    color: #ccc;
+    padding: 40px 24px 24px;
+    text-align: center;
+    font-size: 13px;
+    color: #777;
+  }
+
   @media (max-width: 600px) {
     .schedule-table thead th,
     .schedule-table td { padding: 14px 12px; font-size: 13px; }
     .day-chip { width: 28px; height: 28px; font-size: 9px; }
-    .content { padding: 36px 16px 60px; }
+    .content { padding: 32px 16px 60px; }
   }
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
+<!-- ============ HEADER ============ -->
 <header class="header-bar">
   <nav class="nav">
     <a href="index.html" class="brand">
@@ -309,160 +378,167 @@
         <small>Kho Shipping Lines Incorporated</small>
       </div>
     </a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="schedules.html" class="active">Schedules</a>
+      <a href="index.html#routes">Fares</a>
+      <a href="index.html#routes">Destinations</a>
+      <a href="index.html#contact">Help</a>
+      <a href="index.html#bookingForm" class="nav-cta">Book Now</a>
+    </div>
+    <button class="burger" aria-label="Menu">&#9776;</button>
   </nav>
 </header>
 
-<!-- PAGE HERO -->
+<!-- ============ PAGE HERO ============ -->
 <div class="page-hero">
   <div class="eyebrow">&#9972; KSLi Kho Shipping Lines</div>
   <h1>Ship Schedules</h1>
   <p>View all active routes and sailing days. Schedules are subject to change due to weather or port operations.</p>
 </div>
 
-<!-- CONTENT -->
+<!-- ============ CONTENT ============ -->
 <div class="content">
 
-  <!-- Legend -->
   <div class="legend">
-    <div class="legend-title">Schedule Legend</div>
-    <div class="legend-item"><span class="legend-dot dot-mwf"></span> Monday · Wednesday · Friday</div>
-    <div class="legend-item"><span class="legend-dot dot-tths"></span> Tuesday · Thursday · Saturday</div>
+    <span class="legend-title">Legend:</span>
+    <span class="legend-item"><span class="legend-dot dot-mwf"></span> Monday · Wednesday · Friday</span>
+    <span class="legend-item"><span class="legend-dot dot-tths"></span> Tuesday · Thursday · Saturday</span>
   </div>
 
-  <!-- Schedule Table -->
-  <div class="schedule-group">
-    <div class="schedule-group-title">Active Routes</div>
-    <table class="schedule-table">
-      <thead>
-        <tr>
-          <th>Route</th>
-          <th>Sailing Days</th>
-          <th>Frequency</th>
-        </tr>
-      </thead>
-      <tbody>
+  <table class="schedule-table">
+    <thead>
+      <tr>
+        <th>Route</th>
+        <th>Sailing Days</th>
+        <th>Frequency</th>
+      </tr>
+    </thead>
+    <tbody>
 
-        <!-- MWF routes -->
-        <tr>
-          <td>
-            <div class="route-cell">
-              <span>Mintac</span>
-              <span class="route-arrow">&#10140;</span>
-              <span>Calbayog</span>
-            </div>
-          </td>
-          <td>
-            <div class="days-row">
-              <span class="day-chip active-mwf">M</span>
-              <span class="day-chip">T</span>
-              <span class="day-chip active-mwf">W</span>
-              <span class="day-chip">T</span>
-              <span class="day-chip active-mwf">F</span>
-              <span class="day-chip">S</span>
-              <span class="day-chip">S</span>
-            </div>
-          </td>
-          <td><span class="freq-badge">3× / week</span></td>
-        </tr>
+      <tr>
+        <td>
+          <div class="route-cell">
+            <span>Mintac</span>
+            <span class="route-arrow">&#10140;</span>
+            <span>Calbayog</span>
+          </div>
+        </td>
+        <td>
+          <div class="days-row">
+            <span class="day-chip mwf">M</span>
+            <span class="day-chip">T</span>
+            <span class="day-chip mwf">W</span>
+            <span class="day-chip">T</span>
+            <span class="day-chip mwf">F</span>
+            <span class="day-chip">S</span>
+            <span class="day-chip">S</span>
+          </div>
+        </td>
+        <td><span class="freq-badge">3&times; / week</span></td>
+      </tr>
 
-        <tr>
-          <td>
-            <div class="route-cell">
-              <span>Calbayog</span>
-              <span class="route-arrow">&#10140;</span>
-              <span>Cebu</span>
-            </div>
-          </td>
-          <td>
-            <div class="days-row">
-              <span class="day-chip active-mwf">M</span>
-              <span class="day-chip">T</span>
-              <span class="day-chip active-mwf">W</span>
-              <span class="day-chip">T</span>
-              <span class="day-chip active-mwf">F</span>
-              <span class="day-chip">S</span>
-              <span class="day-chip">S</span>
-            </div>
-          </td>
-          <td><span class="freq-badge">3× / week</span></td>
-        </tr>
+      <tr>
+        <td>
+          <div class="route-cell">
+            <span>Calbayog</span>
+            <span class="route-arrow">&#10140;</span>
+            <span>Cebu</span>
+          </div>
+        </td>
+        <td>
+          <div class="days-row">
+            <span class="day-chip mwf">M</span>
+            <span class="day-chip">T</span>
+            <span class="day-chip mwf">W</span>
+            <span class="day-chip">T</span>
+            <span class="day-chip mwf">F</span>
+            <span class="day-chip">S</span>
+            <span class="day-chip">S</span>
+          </div>
+        </td>
+        <td><span class="freq-badge">3&times; / week</span></td>
+      </tr>
 
-        <tr>
-          <td>
-            <div class="route-cell">
-              <span>Mintac</span>
-              <span class="route-arrow">&#10140;</span>
-              <span>Cebu</span>
-            </div>
-          </td>
-          <td>
-            <div class="days-row">
-              <span class="day-chip active-mwf">M</span>
-              <span class="day-chip">T</span>
-              <span class="day-chip active-mwf">W</span>
-              <span class="day-chip">T</span>
-              <span class="day-chip active-mwf">F</span>
-              <span class="day-chip">S</span>
-              <span class="day-chip">S</span>
-            </div>
-          </td>
-          <td><span class="freq-badge">3× / week</span></td>
-        </tr>
+      <tr>
+        <td>
+          <div class="route-cell">
+            <span>Mintac</span>
+            <span class="route-arrow">&#10140;</span>
+            <span>Cebu</span>
+          </div>
+        </td>
+        <td>
+          <div class="days-row">
+            <span class="day-chip mwf">M</span>
+            <span class="day-chip">T</span>
+            <span class="day-chip mwf">W</span>
+            <span class="day-chip">T</span>
+            <span class="day-chip mwf">F</span>
+            <span class="day-chip">S</span>
+            <span class="day-chip">S</span>
+          </div>
+        </td>
+        <td><span class="freq-badge">3&times; / week</span></td>
+      </tr>
 
-        <!-- TTHS routes -->
-        <tr>
-          <td>
-            <div class="route-cell">
-              <span>Cebu</span>
-              <span class="route-arrow">&#10140;</span>
-              <span>Calbayog</span>
-            </div>
-          </td>
-          <td>
-            <div class="days-row">
-              <span class="day-chip">M</span>
-              <span class="day-chip active-tths">T</span>
-              <span class="day-chip">W</span>
-              <span class="day-chip active-tths">T</span>
-              <span class="day-chip">F</span>
-              <span class="day-chip active-tths">S</span>
-              <span class="day-chip">S</span>
-            </div>
-          </td>
-          <td><span class="freq-badge">3× / week</span></td>
-        </tr>
+      <tr>
+        <td>
+          <div class="route-cell">
+            <span>Cebu</span>
+            <span class="route-arrow">&#10140;</span>
+            <span>Calbayog</span>
+          </div>
+        </td>
+        <td>
+          <div class="days-row">
+            <span class="day-chip">M</span>
+            <span class="day-chip tths">T</span>
+            <span class="day-chip">W</span>
+            <span class="day-chip tths">T</span>
+            <span class="day-chip">F</span>
+            <span class="day-chip tths">S</span>
+            <span class="day-chip">S</span>
+          </div>
+        </td>
+        <td><span class="freq-badge">3&times; / week</span></td>
+      </tr>
 
-        <tr>
-          <td>
-            <div class="route-cell">
-              <span>Calbayog</span>
-              <span class="route-arrow">&#10140;</span>
-              <span>Mintac</span>
-            </div>
-          </td>
-          <td>
-            <div class="days-row">
-              <span class="day-chip">M</span>
-              <span class="day-chip active-tths">T</span>
-              <span class="day-chip">W</span>
-              <span class="day-chip active-tths">T</span>
-              <span class="day-chip">F</span>
-              <span class="day-chip active-tths">S</span>
-              <span class="day-chip">S</span>
-            </div>
-          </td>
-          <td><span class="freq-badge">3× / week</span></td>
-        </tr>
+      <tr>
+        <td>
+          <div class="route-cell">
+            <span>Calbayog</span>
+            <span class="route-arrow">&#10140;</span>
+            <span>Mintac</span>
+          </div>
+        </td>
+        <td>
+          <div class="days-row">
+            <span class="day-chip">M</span>
+            <span class="day-chip tths">T</span>
+            <span class="day-chip">W</span>
+            <span class="day-chip tths">T</span>
+            <span class="day-chip">F</span>
+            <span class="day-chip tths">S</span>
+            <span class="day-chip">S</span>
+          </div>
+        </td>
+        <td><span class="freq-badge">3&times; / week</span></td>
+      </tr>
 
-      </tbody>
-    </table>
-  </div>
+    </tbody>
+  </table>
 
   <div class="schedule-note">
     <strong>Note:</strong> All schedules are subject to change without prior notice due to weather conditions, port availability, or operational requirements. Please confirm your sailing schedule with our booking office before travel.
   </div>
 
 </div>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  &copy; 2026 KSLi Kho Shipping Lines Incorporated. All rights reserved.
+</footer>
 
 </body>
 </html>
