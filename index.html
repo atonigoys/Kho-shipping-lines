@@ -1036,6 +1036,40 @@
     min-height: 16px;
     text-align: center;
   }
+  .id-scan-result {
+    display: none;
+    margin-top: 10px;
+    padding: 9px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.4;
+  }
+  .id-scan-result.scanning {
+    display: block;
+    background: #f1f5f9;
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+  }
+  .id-scan-result.legit {
+    display: block;
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+  }
+  .id-scan-result.suspicious {
+    display: block;
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+  }
+  .id-scan-result.notice {
+    display: block;
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+  }
 
   .pax-footer {
     padding: 16px 26px;
@@ -1735,6 +1769,7 @@
             </label>
             <input type="file" id="idFileInput" accept=".jpg,.jpeg,.png,.pdf" onchange="handleFileUpload(this)" />
             <div class="id-file-name" id="idFileName"></div>
+            <div class="id-scan-result" id="idScanResult"></div>
           </div>
         </div>
 
@@ -1744,7 +1779,7 @@
     </div>
     <div class="pax-footer">
       <button class="pax-back" onclick="backToBlueprint()">&larr; Back</button>
-      <button class="pax-submit" onclick="document.getElementById('paxSubmitBtn').click()">Confirm Booking &#10003;</button>
+      <button class="pax-submit" id="paxConfirmBtn" onclick="document.getElementById('paxSubmitBtn').click()">Confirm Booking &#10003;</button>
     </div>
   </div>
 </div>
@@ -1877,34 +1912,100 @@
 
   function handleFileUpload(input) {
     const file = input.files[0];
-    if (file) {
-      document.getElementById('idFileName').textContent = '✓ ' + file.name;
-      document.getElementById('uploadText').textContent = 'File selected — click to change';
-    }
+    if (!file) return;
+    document.getElementById('idFileName').textContent = '✓ ' + file.name;
+    document.getElementById('uploadText').textContent = 'File selected — click to change';
+    const resultEl = document.getElementById('idScanResult');
+    resultEl.className = 'id-scan-result scanning';
+    resultEl.textContent = '🪪 ID ready — will be verified when you confirm booking.';
   }
 
-  function submitPaxForm(e) {
+  async function submitPaxForm(e) {
     e.preventDefault();
-    const surname   = document.getElementById('paxSurname').value.trim();
-    const fullName  = document.getElementById('paxFullName').value.trim();
-    const mi        = document.getElementById('paxMI').value.trim();
-    const age       = document.getElementById('paxAge').value;
-    const address   = document.getElementById('paxAddress').value.trim();
-    const phone     = document.getElementById('paxPhone').value.trim();
-    const email     = document.getElementById('paxEmail').value.trim();
-    const idFile    = document.getElementById('idFileInput').files[0];
+    const surname  = document.getElementById('paxSurname').value.trim();
+    const fullName = document.getElementById('paxFullName').value.trim();
+    const age      = document.getElementById('paxAge').value;
+    const address  = document.getElementById('paxAddress').value.trim();
+    const phone    = document.getElementById('paxPhone').value.trim();
+    const email    = document.getElementById('paxEmail').value.trim();
+    const idFile   = document.getElementById('idFileInput').files[0];
+    const resultEl = document.getElementById('idScanResult');
+    const confirmBtn = document.getElementById('paxConfirmBtn');
+
+    if (!idFile) {
+      resultEl.className = 'id-scan-result suspicious';
+      resultEl.textContent = '⚠️ Please upload a valid ID to proceed.';
+      return false;
+    }
+
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '🔍 Verifying ID…';
+    resultEl.className = 'id-scan-result scanning';
+    resultEl.textContent = '🔍 Verifying your ID, please wait…';
+
+    let idType = 'Document';
+    let isLegit = true;
+    let verified = false;
+
+    if (idFile.type !== 'application/pdf') {
+      try {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(idFile);
+        });
+        const res = await fetch('/api/scan-id', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64, mediaType: idFile.type })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Confirm Booking ✓';
+          resultEl.className = 'id-scan-result suspicious';
+          resultEl.textContent = '⚠️ Verification error: ' + (data.detail || data.error || 'Please try again.');
+          return false;
+        }
+        idType = data.idType || 'Unknown';
+        isLegit = !!data.isLegit;
+        verified = true;
+      } catch (err) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Confirm Booking ✓';
+        resultEl.className = 'id-scan-result suspicious';
+        resultEl.textContent = '⚠️ Could not reach verification service. Make sure you are on the live site, not a local file.';
+        return false;
+      }
+    } else {
+      idType = 'PDF Document';
+    }
+
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirm Booking ✓';
+
+    if (!isLegit) {
+      resultEl.className = 'id-scan-result suspicious';
+      resultEl.textContent = '⚠️ ' + idType + ' — ID appears invalid. Please upload a clear, valid government-issued ID.';
+      return false;
+    }
+
+    resultEl.className = 'id-scan-result legit';
+    resultEl.textContent = '✅ ' + idType + ' — Verified';
 
     document.getElementById('paxModal').classList.remove('open');
 
     const { from, to, depart, ret, pax } = pendingBooking;
-    const fullDisplay = `${surname}, ${fullName}${mi ? ' ' + mi : ''}`;
+    const fullDisplay = `${surname}, ${fullName}`;
+    const idLabel = verified ? '✅ ' + idType : (idFile ? '📄 ' + idFile.name + ' (pending verification)' : 'None');
     const summary = `
       <div><strong>Passenger:</strong> ${fullDisplay}</div>
       <div><strong>Age:</strong> ${age}</div>
       <div><strong>Address:</strong> ${address}</div>
       <div><strong>Phone:</strong> ${phone}</div>
       ${email ? `<div><strong>Email:</strong> ${email}</div>` : ''}
-      <div><strong>ID Uploaded:</strong> ${idFile ? '✓ ' + idFile.name : 'None'}</div>
+      <div><strong>ID:</strong> ${idLabel}</div>
       <hr style="margin:10px 0;border:0;border-top:1px dashed #ddd"/>
       <div><strong>Trip Type:</strong> ${tripType === 'roundtrip' ? 'Round Trip' : 'One Way'}</div>
       <div><strong>From:</strong> ${from}</div>
