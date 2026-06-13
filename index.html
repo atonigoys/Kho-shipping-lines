@@ -1125,39 +1125,177 @@
     backdrop-filter: blur(4px);
   }
   .modal.open { display: flex; }
-  .modal-card {
-    background: var(--white);
+  .receipt-wrapper {
+    background: #fff;
     border-radius: 18px;
-    padding: 34px;
-    max-width: 460px;
+    max-width: 580px;
     width: 100%;
-    text-align: center;
-    border-top: 6px solid var(--red);
+    max-height: 92vh;
+    overflow-y: auto;
+    box-shadow: 0 24px 70px rgba(0,0,0,0.35);
+    display: flex;
+    flex-direction: column;
   }
-  .modal-card h3 {
+  .receipt-card {
+    padding: 36px 40px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .receipt-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .receipt-logo {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .receipt-company { flex: 1; }
+  .receipt-company-name {
     font-family: 'Playfair Display', serif;
-    color: var(--red);
-    margin-bottom: 12px;
-    font-size: 24px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
   }
-  .modal-card p { color: var(--ink); margin-bottom: 20px; }
-  .modal-card .summary {
-    background: var(--bg-soft);
-    padding: 18px;
-    border-radius: 12px;
-    text-align: left;
-    margin-bottom: 20px;
-    font-size: 14px;
+  .receipt-company-sub {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    margin-top: 3px;
+  }
+  .receipt-stamp {
+    border: 2.5px solid #16a34a;
+    color: #16a34a;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 2.5px;
+    padding: 5px 11px;
+    border-radius: 4px;
+    transform: rotate(-8deg);
+    white-space: nowrap;
+  }
+  .receipt-rule {
+    height: 3px;
+    background: linear-gradient(90deg, var(--red) 0%, #b91c1c 55%, transparent 100%);
+    border-radius: 2px;
+    margin-bottom: 22px;
+  }
+  .receipt-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 26px;
+  }
+  .receipt-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .receipt-title-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .receipt-ref { text-align: right; }
+  .receipt-ref-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .receipt-ref-num {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--red);
+    font-family: 'Courier New', monospace;
+  }
+  .receipt-section { margin-bottom: 22px; }
+  .receipt-section-label {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--red);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 5px;
+    margin-bottom: 14px;
+  }
+  .receipt-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 24px;
+  }
+  .receipt-field { display: flex; flex-direction: column; }
+  .receipt-field.wide { grid-column: 1 / -1; }
+  .receipt-field-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .receipt-field-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-top: 3px;
+  }
+  .receipt-footer-note {
+    border-top: 1px dashed var(--line);
+    padding-top: 14px;
+    margin-top: 6px;
+    font-size: 10.5px;
+    color: var(--muted);
+    text-align: center;
     line-height: 1.8;
   }
-  .modal-card .summary strong { color: var(--red); }
-  .modal-close {
+  .receipt-watermark {
+    position: absolute;
+    font-family: 'Playfair Display', serif;
+    font-size: 130px;
+    font-weight: 900;
+    color: rgba(180,0,0,0.04);
+    pointer-events: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%,-50%) rotate(-30deg);
+    white-space: nowrap;
+    user-select: none;
+  }
+  .receipt-actions {
+    display: flex;
+    gap: 10px;
+    padding: 16px 40px 22px;
+    border-top: 1px solid var(--line);
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+  .btn-download {
     background: var(--red);
-    color: var(--white);
+    color: #fff;
     border: 0;
-    padding: 12px 30px;
-    border-radius: 28px;
+    padding: 10px 24px;
+    border-radius: 50px;
     font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-close-receipt {
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1.5px solid var(--line);
+    padding: 10px 22px;
+    border-radius: 50px;
+    font-weight: 600;
+    font-size: 13px;
     cursor: pointer;
     font-family: inherit;
   }
@@ -1784,14 +1922,59 @@
   </div>
 </div>
 
-<!-- ============ MODAL ============ -->
+<!-- ============ RECEIPT MODAL ============ -->
 <div class="modal" id="confirmModal">
-  <div class="modal-card">
-    <h3>&#9875; Booking Request Received</h3>
-    <p>Thank you for choosing KSLi Kho Shipping Lines!</p>
-    <div class="summary" id="modalSummary"></div>
-    <p style="font-size:13px;color:#888;">An agent will email your fare options shortly.</p>
-    <button class="modal-close" onclick="document.getElementById('confirmModal').classList.remove('open')">Close</button>
+  <div class="receipt-wrapper">
+
+    <!-- Printable area -->
+    <div class="receipt-card" id="receiptCard">
+
+      <div class="receipt-header">
+        <img src="logo.png" alt="KSLi Logo" class="receipt-logo" />
+        <div class="receipt-company">
+          <div class="receipt-company-name">Kho Shipping Lines Inc.</div>
+          <div class="receipt-company-sub">KSLi &bull; Mintac, Masbate &bull; Safe &amp; Reliable Sea Travel</div>
+        </div>
+        <div class="receipt-stamp">CONFIRMED</div>
+      </div>
+
+      <div class="receipt-rule"></div>
+
+      <div class="receipt-title-row">
+        <div>
+          <div class="receipt-title">Booking Confirmation</div>
+          <div class="receipt-title-sub">This serves as your official booking receipt</div>
+        </div>
+        <div class="receipt-ref">
+          <div class="receipt-ref-label">Reference No.</div>
+          <div class="receipt-ref-num" id="receiptRefNum"></div>
+        </div>
+      </div>
+
+      <div class="receipt-section">
+        <div class="receipt-section-label">Passenger Information</div>
+        <div class="receipt-fields" id="receiptPaxFields"></div>
+      </div>
+
+      <div class="receipt-section">
+        <div class="receipt-section-label">Trip Details</div>
+        <div class="receipt-fields" id="receiptTripFields"></div>
+      </div>
+
+      <div class="receipt-footer-note">
+        An agent will contact you shortly with fare and payment details.<br>
+        For inquiries: <strong>kslishipping@gmail.com</strong> &bull; Mintac, Masbate, Philippines
+      </div>
+
+      <div class="receipt-watermark">KSLi</div>
+    </div>
+
+    <!-- Buttons (not included in PDF) -->
+    <div class="receipt-actions">
+      <button class="btn-download" onclick="downloadReceipt()">&#11015; Download PDF</button>
+      <button class="btn-close-receipt" onclick="document.getElementById('confirmModal').classList.remove('open')">Close</button>
+    </div>
+
   </div>
 </div>
 
@@ -1997,30 +2180,59 @@
     document.getElementById('paxModal').classList.remove('open');
 
     const { from, to, depart, ret, pax } = pendingBooking;
-    const fullDisplay = `${surname}, ${fullName}`;
-    const idLabel = verified ? '✅ ' + idType : (idFile ? '📄 ' + idFile.name + ' (pending verification)' : 'None');
-    const summary = `
-      <div><strong>Passenger:</strong> ${fullDisplay}</div>
-      <div><strong>Age:</strong> ${age}</div>
-      <div><strong>Address:</strong> ${address}</div>
-      <div><strong>Phone:</strong> ${phone}</div>
-      ${email ? `<div><strong>Email:</strong> ${email}</div>` : ''}
-      <div><strong>ID:</strong> ${idLabel}</div>
-      <hr style="margin:10px 0;border:0;border-top:1px dashed #ddd"/>
-      <div><strong>Trip Type:</strong> ${tripType === 'roundtrip' ? 'Round Trip' : 'One Way'}</div>
-      <div><strong>From:</strong> ${from}</div>
-      <div><strong>To:</strong> ${to}</div>
-      <div><strong>Departure:</strong> ${depart}</div>
-      ${tripType === 'roundtrip' ? `<div><strong>Return:</strong> ${ret}</div>` : ''}
-      <div><strong>Passengers:</strong> ${pax}</div>
-      <div><strong>Cabin:</strong> ${selectedCabin}</div>
-    `;
-    document.getElementById('modalSummary').innerHTML = summary;
+    const idLabel = verified ? '✅ ' + idType : (idFile ? idFile.name + ' (pending verification)' : 'None');
+
+    const refNum = 'KSLi-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-' + Math.floor(1000 + Math.random() * 9000);
+    document.getElementById('receiptRefNum').textContent = refNum;
+
+    function rf(label, value, wide) {
+      return `<div class="receipt-field${wide ? ' wide' : ''}">
+        <span class="receipt-field-label">${label}</span>
+        <span class="receipt-field-value">${value}</span>
+      </div>`;
+    }
+
+    document.getElementById('receiptPaxFields').innerHTML =
+      rf('Passenger Name', `${surname}, ${fullName}`, true) +
+      rf('Age', age) +
+      rf('Phone', phone) +
+      (email ? rf('Email', email) : '') +
+      rf('Address', address, true) +
+      rf('Valid ID', idLabel, true);
+
+    document.getElementById('receiptTripFields').innerHTML =
+      rf('Trip Type', tripType === 'roundtrip' ? 'Round Trip' : 'One Way') +
+      rf('Cabin No.', selectedCabin) +
+      rf('From', from) +
+      rf('To', to) +
+      rf('Departure', depart) +
+      (tripType === 'roundtrip' ? rf('Return Date', ret) : '') +
+      rf('No. of Passengers', pax);
+
     document.getElementById('confirmModal').classList.add('open');
     pendingBooking = null;
     return false;
   }
+
+  function downloadReceipt() {
+    const el = document.getElementById('receiptCard');
+    const ref = document.getElementById('receiptRefNum').textContent || 'KSLi-Booking';
+    const btn = document.querySelector('.btn-download');
+    btn.textContent = 'Generating…';
+    btn.disabled = true;
+    html2pdf().set({
+      margin: 8,
+      filename: ref + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a5', orientation: 'portrait' }
+    }).from(el).save().then(function() {
+      btn.textContent = '⬇ Download PDF';
+      btn.disabled = false;
+    });
+  }
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </body>
 </html>
 
