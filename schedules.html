@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ship Schedules – KSLi Kho Shipping Lines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red:        #c8102e;
+    --red-dark:   #9a0c23;
+    --red-soft:   #ffe8eb;
+    --white:      #ffffff;
+    --ink:        #1a1a1a;
+    --ink-soft:   #4a4a4a;
+    --muted:      #8a8a8a;
+    --line:       #ececec;
+    --bg-soft:    #f5f6f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    background: var(--bg-soft);
+    line-height: 1.55;
+  }
+
+  /* HEADER */
+  .header-bar {
+    background: var(--white);
+    box-shadow: 0 2px 18px rgba(0,0,0,0.08);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .nav {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 12px 31px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-decoration: none;
+  }
+  .brand-mark {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--white);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
+  .brand-text {
+    color: var(--red);
+    font-weight: 900;
+    font-size: 36px;
+    line-height: 1;
+    font-family: 'Inter', sans-serif;
+  }
+  .brand-text small {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 4px;
+    color: var(--red);
+  }
+
+  /* PAGE HERO */
+  .page-hero {
+    background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+    color: var(--white);
+    padding: 56px 24px 52px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-hero::before {
+    content: "";
+    position: absolute;
+    top: -60%;
+    right: -8%;
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%);
+    pointer-events: none;
+  }
+  .page-hero .eyebrow {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    opacity: 0.85;
+    margin-bottom: 12px;
+  }
+  .page-hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 800;
+    line-height: 1.1;
+  }
+  .page-hero p {
+    margin-top: 12px;
+    font-size: 16px;
+    opacity: 0.9;
+    max-width: 520px;
+    margin-inline: auto;
+  }
+
+  /* CONTENT */
+  .content {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+  }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 40px;
+    background: var(--white);
+    border-radius: 12px;
+    padding: 18px 22px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .legend-title {
+    width: 100%;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .dot-mwf { background: var(--red); }
+  .dot-tths { background: #1a6fc4; }
+
+  /* SCHEDULE TABLE */
+  .schedule-group {
+    margin-bottom: 40px;
+  }
+  .schedule-group-title {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    padding-left: 4px;
+  }
+  .schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--white);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 22px rgba(0,0,0,0.07);
+  }
+  .schedule-table thead tr {
+    background: var(--ink);
+    color: var(--white);
+  }
+  .schedule-table thead th {
+    padding: 16px 20px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .schedule-table tbody tr {
+    border-bottom: 1px solid var(--line);
+    transition: background .15s ease;
+  }
+  .schedule-table tbody tr:last-child { border-bottom: none; }
+  .schedule-table tbody tr:hover { background: #fafafa; }
+  .schedule-table td {
+    padding: 18px 20px;
+    font-size: 15px;
+    vertical-align: middle;
+  }
+  .route-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .route-arrow {
+    color: var(--red);
+    font-size: 18px;
+  }
+  .days-badge {
+    display: inline-flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .day {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .day.mwf {
+    background: var(--red-soft);
+    color: var(--red);
+  }
+  .day.tths {
+    background: #deeaf8;
+    color: #1a6fc4;
+  }
+  .freq-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    background: var(--bg-soft);
+    border-radius: 20px;
+    padding: 4px 12px;
+  }
+
+  /* DAY CHIPS */
+  .days-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .day-chip {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 800;
+    border: 2px solid var(--line);
+    color: var(--muted);
+  }
+  .day-chip.active-mwf {
+    background: var(--red);
+    border-color: var(--red);
+    color: var(--white);
+  }
+  .day-chip.active-tths {
+    background: #1a6fc4;
+    border-color: #1a6fc4;
+    color: var(--white);
+  }
+
+  /* NOTE */
+  .schedule-note {
+    margin-top: 32px;
+    background: var(--red-soft);
+    border: 1px solid rgba(200,16,46,0.18);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+  }
+  .schedule-note strong { color: var(--red); }
+
+  @media (max-width: 600px) {
+    .schedule-table thead th,
+    .schedule-table td { padding: 14px 12px; font-size: 13px; }
+    .day-chip { width: 28px; height: 28px; font-size: 9px; }
+    .content { padding: 36px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header-bar">
+  <nav class="nav">
+    <a href="index.html" class="brand">
+      <div class="brand-mark">
+        <img src="KSL%20logo.png" alt="KSLi Kho Shipping Lines logo" />
+      </div>
+      <div class="brand-text">
+        KSL
+        <small>Kho Shipping Lines Incorporated</small>
+      </div>
+    </a>
+  </nav>
+</header>
+
+<!-- PAGE HERO -->
+<div class="page-hero">
+  <div class="eyebrow">&#9972; KSLi Kho Shipping Lines</div>
+  <h1>Ship Schedules</h1>
+  <p>View all active routes and sailing days. Schedules are subject to change due to weather or port operations.</p>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-title">Schedule Legend</div>
+    <div class="legend-item"><span class="legend-dot dot-mwf"></span> Monday · Wednesday · Friday</div>
+    <div class="legend-item"><span class="legend-dot dot-tths"></span> Tuesday · Thursday · Saturday</div>
+  </div>
+
+  <!-- Schedule Table -->
+  <div class="schedule-group">
+    <div class="schedule-group-title">Active Routes</div>
+    <table class="schedule-table">
+      <thead>
+        <tr>
+          <th>Route</th>
+          <th>Sailing Days</th>
+          <th>Frequency</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- MWF routes -->
+        <tr>
+          <td>
+            <div class="route-cell">
+              <span>Mintac</span>
+              <span class="route-arrow">&#10140;</span>
+              <span>Calbayog</span>
+            </div>
+          </td>
+          <td>
+            <div class="days-row">
+              <span class="day-chip active-mwf">M</span>
+              <span class="day-chip">T</span>
+              <span class="day-chip active-mwf">W</span>
+              <span class="day-chip">T</span>
+              <span class="day-chip active-mwf">F</span>
+              <span class="day-chip">S</span>
+              <span class="day-chip">S</span>
+            </div>
+          </td>
+          <td><span class="freq-badge">3× / week</span></td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="route-cell">
+              <span>Calbayog</span>
+              <span class="route-arrow">&#10140;</span>
+              <span>Cebu</span>
+            </div>
+          </td>
+          <td>
+            <div class="days-row">
+              <span class="day-chip active-mwf">M</span>
+              <span class="day-chip">T</span>
+              <span class="day-chip active-mwf">W</span>
+              <span class="day-chip">T</span>
+              <span class="day-chip active-mwf">F</span>
+              <span class="day-chip">S</span>
+              <span class="day-chip">S</span>
+            </div>
+          </td>
+          <td><span class="freq-badge">3× / week</span></td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="route-cell">
+              <span>Mintac</span>
+              <span class="route-arrow">&#10140;</span>
+              <span>Cebu</span>
+            </div>
+          </td>
+          <td>
+            <div class="days-row">
+              <span class="day-chip active-mwf">M</span>
+              <span class="day-chip">T</span>
+              <span class="day-chip active-mwf">W</span>
+              <span class="day-chip">T</span>
+              <span class="day-chip active-mwf">F</span>
+              <span class="day-chip">S</span>
+              <span class="day-chip">S</span>
+            </div>
+          </td>
+          <td><span class="freq-badge">3× / week</span></td>
+        </tr>
+
+        <!-- TTHS routes -->
+        <tr>
+          <td>
+            <div class="route-cell">
+              <span>Cebu</span>
+              <span class="route-arrow">&#10140;</span>
+              <span>Calbayog</span>
+            </div>
+          </td>
+          <td>
+            <div class="days-row">
+              <span class="day-chip">M</span>
+              <span class="day-chip active-tths">T</span>
+              <span class="day-chip">W</span>
+              <span class="day-chip active-tths">T</span>
+              <span class="day-chip">F</span>
+              <span class="day-chip active-tths">S</span>
+              <span class="day-chip">S</span>
+            </div>
+          </td>
+          <td><span class="freq-badge">3× / week</span></td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="route-cell">
+              <span>Calbayog</span>
+              <span class="route-arrow">&#10140;</span>
+              <span>Mintac</span>
+            </div>
+          </td>
+          <td>
+            <div class="days-row">
+              <span class="day-chip">M</span>
+              <span class="day-chip active-tths">T</span>
+              <span class="day-chip">W</span>
+              <span class="day-chip active-tths">T</span>
+              <span class="day-chip">F</span>
+              <span class="day-chip active-tths">S</span>
+              <span class="day-chip">S</span>
+            </div>
+          </td>
+          <td><span class="freq-badge">3× / week</span></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <div class="schedule-note">
+    <strong>Note:</strong> All schedules are subject to change without prior notice due to weather conditions, port availability, or operational requirements. Please confirm your sailing schedule with our booking office before travel.
+  </div>
+
+</div>
+
+</body>
+</html>
