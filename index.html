@@ -788,6 +788,85 @@
   }
   .cta-btn:hover { transform: translateY(-2px); }
 
+  /* =================== POLICY SECTION =================== */
+  .policy-section {
+    padding: 80px 24px;
+    background: var(--bg-soft);
+  }
+  .policy-section .container {
+    max-width: 860px;
+  }
+  .policy-section .section-head {
+    margin-bottom: 40px;
+  }
+  .policy-items {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  .policy-item {
+    background: var(--white);
+    border-radius: 14px;
+    padding: 28px 30px;
+    border-left: 5px solid var(--red);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+  }
+  .policy-item h3 {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--ink);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .policy-item h3 .policy-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--red);
+    color: var(--white);
+    font-size: 13px;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .policy-item ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .policy-item ul li {
+    font-size: 14px;
+    color: var(--ink-soft);
+    padding-left: 18px;
+    position: relative;
+    line-height: 1.65;
+  }
+  .policy-item ul li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: var(--red);
+    font-weight: 800;
+  }
+  .policy-note {
+    margin-top: 32px;
+    background: var(--red-soft);
+    border: 1px solid rgba(200,16,46,0.18);
+    border-radius: 10px;
+    padding: 18px 22px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-align: center;
+    line-height: 1.7;
+  }
+  .policy-note strong { color: var(--red); }
+
   /* =================== FOOTER =================== */
   footer {
     background: var(--ink);
@@ -1071,6 +1150,82 @@
     <svg viewBox="0 0 1440 110" preserveAspectRatio="none">
       <path d="M0,40 C240,100 480,0 720,40 C960,80 1200,20 1440,50 L1440,110 L0,110 Z" fill="#ffffff"></path>
     </svg>
+  </div>
+</section>
+
+<!-- ============ POLICY ============ -->
+<section class="policy-section" id="policy">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">Important Information</div>
+      <h2>Booking, Cancellation &amp; Refund Policy</h2>
+      <p>Please read our policies carefully before completing your booking.</p>
+    </div>
+    <div class="policy-items">
+
+      <div class="policy-item">
+        <h3><span class="policy-num">1</span> Booking Confirmation</h3>
+        <ul>
+          <li>All bookings are subject to availability and confirmation.</li>
+          <li>A booking is considered confirmed only after full payment has been successfully received.</li>
+          <li>Customers are responsible for providing accurate passenger and contact information during the booking process.</li>
+        </ul>
+      </div>
+
+      <div class="policy-item">
+        <h3><span class="policy-num">2</span> Cancellation Policy</h3>
+        <ul>
+          <li>Customers may cancel their booking at any time before the scheduled departure date.</li>
+          <li>Cancellation requests must be submitted through our official communication channels.</li>
+        </ul>
+      </div>
+
+      <div class="policy-item">
+        <h3><span class="policy-num">3</span> Refund Policy</h3>
+        <ul>
+          <li>Approved cancellations are eligible for a <strong>50% refund</strong> of the total booking amount.</li>
+          <li>The remaining 50% is non-refundable and covers administrative, processing, and reservation costs.</li>
+          <li>Refunds will be processed using the original payment method whenever possible.</li>
+          <li>Refund processing may take <strong>5–15 business days</strong>, depending on the payment provider or bank.</li>
+        </ul>
+      </div>
+
+      <div class="policy-item">
+        <h3><span class="policy-num">4</span> No-Show Policy</h3>
+        <ul>
+          <li>Passengers who fail to appear for their scheduled trip without prior cancellation will be considered a "No-Show."</li>
+          <li>No refunds will be issued for No-Show bookings.</li>
+        </ul>
+      </div>
+
+      <div class="policy-item">
+        <h3><span class="policy-num">5</span> Schedule Changes</h3>
+        <ul>
+          <li>We reserve the right to modify schedules, routes, or services due to weather conditions, operational requirements, safety concerns, or other unforeseen circumstances.</li>
+          <li>In the event of a cancellation initiated by our company, customers may be offered a rescheduled trip or a refund in accordance with applicable regulations.</li>
+        </ul>
+      </div>
+
+      <div class="policy-item">
+        <h3><span class="policy-num">6</span> Customer Responsibility</h3>
+        <ul>
+          <li>Passengers must arrive at the designated boarding area at least <strong>30 minutes before departure</strong>.</li>
+          <li>Valid identification may be required prior to boarding.</li>
+          <li>Failure to comply with boarding requirements may result in denied boarding without refund.</li>
+        </ul>
+      </div>
+
+      <div class="policy-item">
+        <h3><span class="policy-num">7</span> Contact Information</h3>
+        <ul>
+          <li>For booking modifications, cancellations, or refund requests, please contact our customer support team through our official website, email, or customer service channels.</li>
+        </ul>
+      </div>
+
+    </div>
+    <div class="policy-note">
+      <strong>By completing a booking, the customer acknowledges and agrees to this Booking, Cancellation, and Refund Policy.</strong>
+    </div>
   </div>
 </section>
 
