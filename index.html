@@ -917,6 +917,167 @@
     font-size: 13px;
   }
 
+  /* =================== PASSENGER FORM MODAL =================== */
+  .pax-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.70);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(5px);
+  }
+  .pax-modal.open { display: flex; }
+  .pax-card {
+    background: var(--white);
+    border-radius: 18px;
+    overflow: hidden;
+    max-width: 560px;
+    width: 100%;
+    border-top: 6px solid var(--red);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.4);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .pax-header {
+    padding: 20px 26px 14px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .pax-header h3 {
+    font-family: 'Playfair Display', serif;
+    color: var(--red);
+    font-size: 20px;
+    margin-bottom: 3px;
+  }
+  .pax-header p { font-size: 13px; color: var(--muted); }
+  .pax-body {
+    padding: 20px 26px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .pax-row {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .pax-row.cols-2 { grid-template-columns: 1fr 1fr; }
+  .pax-row.cols-3 { grid-template-columns: 2fr 1fr 1fr; }
+  .pax-row.cols-1 { grid-template-columns: 1fr; }
+  .pax-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+  }
+  .pax-field label .opt {
+    color: var(--muted);
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .pax-input {
+    width: 100%;
+    border: 1.5px solid #e6e9ee;
+    border-radius: 9px;
+    padding: 11px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--white);
+    transition: border-color .2s, box-shadow .2s;
+    outline: none;
+  }
+  .pax-input:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 4px rgba(200,16,46,0.10);
+  }
+  .pax-input::placeholder { color: #bcc2cc; font-weight: 400; }
+
+  /* ID Upload */
+  .id-upload-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 2px dashed #d0d7e2;
+    border-radius: 12px;
+    padding: 28px 20px;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    background: #fafbfc;
+    text-align: center;
+  }
+  .id-upload-label:hover { border-color: var(--red); background: var(--red-soft); }
+  .id-upload-label .upload-icon { font-size: 32px; }
+  .id-upload-label .upload-text {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-soft);
+  }
+  .id-upload-label .upload-hint {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  #idFileInput { display: none; }
+  .id-file-name {
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--red);
+    min-height: 16px;
+    text-align: center;
+  }
+
+  .pax-footer {
+    padding: 16px 26px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+  .pax-back {
+    background: transparent;
+    border: 2px solid var(--line);
+    color: var(--ink-soft);
+    padding: 11px 22px;
+    border-radius: 28px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    transition: border-color .2s;
+  }
+  .pax-back:hover { border-color: var(--muted); }
+  .pax-submit {
+    background: linear-gradient(135deg, var(--red), #ff1837);
+    color: var(--white);
+    border: 0;
+    padding: 11px 28px;
+    border-radius: 28px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    box-shadow: 0 8px 20px rgba(200,16,46,0.30);
+    transition: background .2s, transform .15s;
+  }
+  .pax-submit:hover { background: var(--red-dark); transform: translateY(-1px); }
+
+  @media (max-width: 560px) {
+    .pax-row.cols-3 { grid-template-columns: 1fr 1fr; }
+    .pax-row.cols-2 { grid-template-columns: 1fr; }
+  }
+
   /* =================== MODAL =================== */
   .modal {
     display: none;
@@ -1518,6 +1679,80 @@
   </div>
 </div>
 
+<!-- ============ PASSENGER FORM MODAL ============ -->
+<div class="pax-modal" id="paxModal">
+  <div class="pax-card">
+    <div class="pax-header">
+      <h3>&#128100; Passenger Information</h3>
+      <p>Please fill in your details to complete the booking.</p>
+    </div>
+    <div class="pax-body">
+      <form id="paxForm" onsubmit="return submitPaxForm(event)">
+
+        <div class="pax-row cols-3">
+          <div class="pax-field">
+            <label>Surname</label>
+            <input class="pax-input" type="text" id="paxSurname" placeholder="e.g. Santos" required />
+          </div>
+          <div class="pax-field">
+            <label>Middle Initial</label>
+            <input class="pax-input" type="text" id="paxMI" placeholder="e.g. R." maxlength="4" />
+          </div>
+          <div class="pax-field">
+            <label>Age</label>
+            <input class="pax-input" type="number" id="paxAge" placeholder="e.g. 28" min="1" max="120" required />
+          </div>
+        </div>
+
+        <div class="pax-row cols-1">
+          <div class="pax-field">
+            <label>Full Name <span class="opt">(First &amp; Middle name)</span></label>
+            <input class="pax-input" type="text" id="paxFullName" placeholder="e.g. Maria Rosario" required />
+          </div>
+        </div>
+
+        <div class="pax-row cols-1">
+          <div class="pax-field">
+            <label>Address</label>
+            <input class="pax-input" type="text" id="paxAddress" placeholder="e.g. Brgy. Poblacion, Masbate City" required />
+          </div>
+        </div>
+
+        <div class="pax-row cols-2">
+          <div class="pax-field">
+            <label>Phone Number</label>
+            <input class="pax-input" type="tel" id="paxPhone" placeholder="e.g. 09XX XXX XXXX" required />
+          </div>
+          <div class="pax-field">
+            <label>Email <span class="opt">(optional)</span></label>
+            <input class="pax-input" type="email" id="paxEmail" placeholder="e.g. you@email.com" />
+          </div>
+        </div>
+
+        <div class="pax-row cols-1">
+          <div class="pax-field">
+            <label>Valid ID</label>
+            <label class="id-upload-label" for="idFileInput">
+              <span class="upload-icon">&#128196;</span>
+              <span class="upload-text" id="uploadText">Click to upload your ID</span>
+              <span class="upload-hint">Accepted: JPG, PNG, PDF &mdash; max 5MB</span>
+            </label>
+            <input type="file" id="idFileInput" accept=".jpg,.jpeg,.png,.pdf" onchange="handleFileUpload(this)" />
+            <div class="id-file-name" id="idFileName"></div>
+          </div>
+        </div>
+
+        <!-- hidden submit trigger -->
+        <button type="submit" id="paxSubmitBtn" style="display:none"></button>
+      </form>
+    </div>
+    <div class="pax-footer">
+      <button class="pax-back" onclick="backToBlueprint()">&larr; Back</button>
+      <button class="pax-submit" onclick="document.getElementById('paxSubmitBtn').click()">Confirm Booking &#10003;</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL ============ -->
 <div class="modal" id="confirmModal">
   <div class="modal-card">
@@ -1636,8 +1871,45 @@
       return;
     }
     document.getElementById('blueprintModal').classList.remove('open');
+    document.getElementById('paxModal').classList.add('open');
+  }
+
+  function backToBlueprint() {
+    document.getElementById('paxModal').classList.remove('open');
+    document.getElementById('blueprintModal').classList.add('open');
+  }
+
+  function handleFileUpload(input) {
+    const file = input.files[0];
+    if (file) {
+      document.getElementById('idFileName').textContent = '✓ ' + file.name;
+      document.getElementById('uploadText').textContent = 'File selected — click to change';
+    }
+  }
+
+  function submitPaxForm(e) {
+    e.preventDefault();
+    const surname   = document.getElementById('paxSurname').value.trim();
+    const fullName  = document.getElementById('paxFullName').value.trim();
+    const mi        = document.getElementById('paxMI').value.trim();
+    const age       = document.getElementById('paxAge').value;
+    const address   = document.getElementById('paxAddress').value.trim();
+    const phone     = document.getElementById('paxPhone').value.trim();
+    const email     = document.getElementById('paxEmail').value.trim();
+    const idFile    = document.getElementById('idFileInput').files[0];
+
+    document.getElementById('paxModal').classList.remove('open');
+
     const { from, to, depart, ret, pax } = pendingBooking;
+    const fullDisplay = `${surname}, ${fullName}${mi ? ' ' + mi : ''}`;
     const summary = `
+      <div><strong>Passenger:</strong> ${fullDisplay}</div>
+      <div><strong>Age:</strong> ${age}</div>
+      <div><strong>Address:</strong> ${address}</div>
+      <div><strong>Phone:</strong> ${phone}</div>
+      ${email ? `<div><strong>Email:</strong> ${email}</div>` : ''}
+      <div><strong>ID Uploaded:</strong> ${idFile ? '✓ ' + idFile.name : 'None'}</div>
+      <hr style="margin:10px 0;border:0;border-top:1px dashed #ddd"/>
       <div><strong>Trip Type:</strong> ${tripType === 'roundtrip' ? 'Round Trip' : 'One Way'}</div>
       <div><strong>From:</strong> ${from}</div>
       <div><strong>To:</strong> ${to}</div>
@@ -1649,6 +1921,7 @@
     document.getElementById('modalSummary').innerHTML = summary;
     document.getElementById('confirmModal').classList.add('open');
     pendingBooking = null;
+    return false;
   }
 </script>
 </body>
