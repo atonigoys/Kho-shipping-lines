@@ -2221,16 +2221,16 @@
     btn.textContent = 'Generating…';
     btn.disabled = true;
 
-    // Clone outside the modal so html2pdf captures the full height without scroll clipping
+    // Clone positioned in the current viewport so html2canvas can find it
     const clone = source.cloneNode(true);
-    clone.style.cssText = 'position:fixed;left:-9999px;top:0;width:520px;background:#fff;font-family:Inter,sans-serif;';
+    clone.style.cssText = `position:absolute;top:${window.scrollY}px;left:0;width:540px;background:#fff;z-index:-9999;pointer-events:none;`;
     document.body.appendChild(clone);
 
     html2pdf().set({
-      margin: [12, 12, 12, 12],
+      margin: 12,
       filename: ref + '.pdf',
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: 'avoid-all' }
     }).from(clone).save().then(function() {
