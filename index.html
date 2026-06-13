@@ -1689,6 +1689,13 @@
     <div class="pax-body">
       <form id="paxForm" onsubmit="return submitPaxForm(event)">
 
+        <div class="pax-row cols-1">
+          <div class="pax-field">
+            <label>Full Name <span class="opt">(First &amp; Middle name)</span></label>
+            <input class="pax-input" type="text" id="paxFullName" placeholder="e.g. Maria Rosario" required />
+          </div>
+        </div>
+
         <div class="pax-row cols-3">
           <div class="pax-field">
             <label>Surname</label>
@@ -1701,13 +1708,6 @@
           <div class="pax-field">
             <label>Age</label>
             <input class="pax-input" type="number" id="paxAge" placeholder="e.g. 28" min="1" max="120" required />
-          </div>
-        </div>
-
-        <div class="pax-row cols-1">
-          <div class="pax-field">
-            <label>Full Name <span class="opt">(First &amp; Middle name)</span></label>
-            <input class="pax-input" type="text" id="paxFullName" placeholder="e.g. Maria Rosario" required />
           </div>
         </div>
 
