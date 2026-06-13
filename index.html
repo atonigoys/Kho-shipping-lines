@@ -2215,32 +2215,54 @@
   }
 
   function downloadReceipt() {
-    const source = document.getElementById('receiptCard');
+    const el = document.getElementById('receiptCard');
     const ref = document.getElementById('receiptRefNum').textContent || 'KSLi-Booking';
     const btn = document.querySelector('.btn-download');
-    btn.textContent = 'Generating…';
-    btn.disabled = true;
 
-    // Clone positioned in the current viewport so html2canvas can find it
-    const clone = source.cloneNode(true);
-    clone.style.cssText = `position:absolute;top:${window.scrollY}px;left:0;width:540px;background:#fff;z-index:-9999;pointer-events:none;`;
-    document.body.appendChild(clone);
+    // Collect all inline styles from this page
+    const styles = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('');
 
-    html2pdf().set({
-      margin: 12,
-      filename: ref + '.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: 'avoid-all' }
-    }).from(clone).save().then(function() {
-      document.body.removeChild(clone);
-      btn.textContent = '⬇ Download PDF';
-      btn.disabled = false;
+    // Fix relative image src to absolute so they load in the new window
+    const origin = window.location.origin;
+    const html = el.outerHTML.replace(/src="([^"]+)"/g, function(m, src) {
+      return (src.startsWith('http') || src.startsWith('data:')) ? m : `src="${origin}/${src}"`;
     });
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('Please allow pop-ups for this site, then try again.');
+      return;
+    }
+
+    win.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${ref} — KSLi Booking Receipt</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  ${styles}
+  <style>
+    body { margin: 0; padding: 28px; background: #fff; font-family: 'Inter', sans-serif; }
+    .receipt-wrapper { box-shadow: none; max-height: none; overflow: visible; border-radius: 0; }
+    .receipt-watermark { display: none; }
+    @media print {
+      body { padding: 0; }
+      @page { margin: 12mm; size: A4 portrait; }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt-wrapper">${html}</div>
+  <script>
+    document.fonts.ready.then(function() {
+      setTimeout(function() { window.print(); }, 400);
+    });
+  <\/script>
+</body>
+</html>`);
+    win.document.close();
   }
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </body>
 </html>
 
