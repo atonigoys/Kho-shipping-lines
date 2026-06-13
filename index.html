@@ -2027,7 +2027,7 @@
 
         <div class="pax-row cols-1">
           <div class="pax-field">
-            <label>Valid ID</label>
+            <label>Valid ID <span class="opt">(optional)</span></label>
             <label class="id-upload-label" for="idFileInput">
               <span class="upload-icon">&#128196;</span>
               <span class="upload-text" id="uploadText">Click to upload your ID</span>
@@ -2327,22 +2327,18 @@
     const resultEl = document.getElementById('idScanResult');
     const confirmBtn = document.getElementById('paxConfirmBtn');
 
-    if (!idFile) {
-      resultEl.className = 'id-scan-result suspicious';
-      resultEl.textContent = '⚠️ Please upload a valid ID to proceed.';
-      return false;
-    }
-
     confirmBtn.disabled = true;
-    confirmBtn.textContent = '🔍 Verifying ID…';
-    resultEl.className = 'id-scan-result scanning';
-    resultEl.textContent = '🔍 Verifying your ID, please wait…';
+    confirmBtn.textContent = idFile ? '🔍 Verifying ID…' : 'Processing…';
+    if (idFile) {
+      resultEl.className = 'id-scan-result scanning';
+      resultEl.textContent = '🔍 Verifying your ID, please wait…';
+    }
 
     let idType = 'Document';
     let isLegit = true;
     let verified = false;
 
-    if (idFile.type !== 'application/pdf') {
+    if (idFile && idFile.type !== 'application/pdf') {
       try {
         const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader();
@@ -2373,8 +2369,10 @@
         resultEl.textContent = '⚠️ Could not reach verification service. Make sure you are on the live site, not a local file.';
         return false;
       }
-    } else {
+    } else if (idFile) {
       idType = 'PDF Document';
+    } else {
+      idType = 'None';
     }
 
     confirmBtn.disabled = false;
