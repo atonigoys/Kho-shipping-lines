@@ -1403,6 +1403,30 @@
   }
   .pay-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .pay-btn:not(:disabled):hover { background: var(--red-dark); }
+  .fare-summary {
+    margin: 0 28px 16px;
+    background: var(--bg-soft);
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
+  .fare-summary-title {
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--red); margin-bottom: 10px;
+  }
+  .fare-line {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 0; font-size: 13px; color: var(--ink-soft);
+    border-bottom: 1px dashed var(--line);
+  }
+  .fare-line:last-child { border-bottom: none; }
+  .fare-line b { color: var(--ink); }
+  .fare-disc-val { color: #16a34a; font-weight: 700; }
+  .fare-total-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0 0; margin-top: 8px; border-top: 2px solid var(--line);
+  }
+  .fare-total-label { font-weight: 800; font-size: 14px; color: var(--ink); }
+  .fare-total-amount { font-weight: 900; font-size: 22px; color: var(--red); }
 
   /* =================== BLUEPRINT MODAL =================== */
   .blueprint-modal {
@@ -2066,6 +2090,26 @@
 
     </div>
 
+    <div class="fare-summary">
+      <div class="fare-summary-title">&#128178; Fare Summary</div>
+      <div class="fare-line">
+        <span>Route</span><b id="payRoute">—</b>
+      </div>
+      <div class="fare-line">
+        <span>Passengers</span><b id="payPaxCount">—</b>
+      </div>
+      <div class="fare-line">
+        <span>Base Fare / person</span><b id="payBaseFare">—</b>
+      </div>
+      <div class="fare-line" id="payDiscountRow" style="display:none">
+        <span>Discount (2%)</span><span class="fare-disc-val" id="payDiscountAmt">—</span>
+      </div>
+      <div class="fare-total-row">
+        <span class="fare-total-label">Total to Pay</span>
+        <span class="fare-total-amount" id="payTotal">—</span>
+      </div>
+    </div>
+
     <div class="payment-mock-note">
       &#9888;&#65039; <strong>Demo only</strong> &mdash; No actual payment will be processed.
     </div>
@@ -2193,6 +2237,16 @@
   let selectedCabin = null;
   let pendingPax = null;
   let selectedPayment = null;
+
+  const FARES = {
+    'Mintac-Calbayog': 850,
+    'Calbayog-Cebu': 1300,
+    'Mintac-Cebu': 1430,
+    'Cebu-Calbayog': 1250,
+    'Calbayog-Mintac': 650,
+  };
+  const DISCOUNT_IDS = ['Student ID', 'Senior Citizen ID', 'PWD ID'];
+  const fmt = n => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
   function selectCabin(el, num) {
     if (el.classList.contains('taken')) return;
@@ -2335,8 +2389,30 @@
     resultEl.className = 'id-scan-result legit';
     resultEl.textContent = '✅ ' + idType + ' — Verified';
 
-    // Store passenger data and show payment modal
-    pendingPax = { surname, fullName, age, address, phone, email, idType, verified, idFile };
+    // Calculate fare based on route
+    const { from, to, pax: numPaxStr } = pendingBooking;
+    const numPassengers = parseInt(numPaxStr) || 1;
+    const baseFare = FARES[`${from}-${to}`] || 0;
+    const isDiscounted = DISCOUNT_IDS.includes(idType) && verified;
+    const discountPerPax = isDiscounted ? +(baseFare * 0.02).toFixed(2) : 0;
+    const farePerPax = +(baseFare - discountPerPax).toFixed(2);
+    const totalFare = +(farePerPax * numPassengers).toFixed(2);
+
+    // Populate fare summary
+    document.getElementById('payRoute').textContent = `${from} → ${to}`;
+    document.getElementById('payPaxCount').textContent = numPassengers;
+    document.getElementById('payBaseFare').textContent = fmt(baseFare);
+    if (isDiscounted) {
+      document.getElementById('payDiscountRow').style.display = 'flex';
+      document.getElementById('payDiscountAmt').textContent = `− ${fmt(discountPerPax)} / person`;
+    } else {
+      document.getElementById('payDiscountRow').style.display = 'none';
+    }
+    document.getElementById('payTotal').textContent = fmt(totalFare);
+    document.getElementById('payBtn').textContent = `Pay ${fmt(totalFare)} ✓`;
+
+    // Store all data and show payment modal
+    pendingPax = { surname, fullName, age, address, phone, email, idType, verified, idFile, baseFare, farePerPax, discountPerPax, totalFare, isDiscounted };
     selectedPayment = null;
     document.querySelectorAll('.payment-option').forEach(o => o.classList.remove('selected'));
     document.getElementById('payBtn').disabled = true;
@@ -2350,7 +2426,9 @@
     document.querySelectorAll('.payment-option').forEach(o => o.classList.remove('selected'));
     el.classList.add('selected');
     selectedPayment = method;
-    document.getElementById('payBtn').disabled = false;
+    const btn = document.getElementById('payBtn');
+    btn.disabled = false;
+    btn.textContent = `Pay ${fmt(pendingPax.totalFare)} ✓`;
   }
 
   function backToForm() {
@@ -2384,15 +2462,22 @@
       rf('Address', address, true) +
       rf('Valid ID', idLabel, true);
 
+    const { baseFare, farePerPax, discountPerPax, totalFare, isDiscounted } = pendingPax;
+    const fareLabel = isDiscounted
+      ? `${fmt(farePerPax)} <span style="font-size:10px;background:#dcfce7;color:#16a34a;padding:2px 6px;border-radius:8px;font-weight:700;">2% OFF</span>`
+      : fmt(farePerPax);
+
     document.getElementById('receiptTripFields').innerHTML =
       rf('Trip Type', tripType === 'roundtrip' ? 'Round Trip' : 'One Way') +
       rf('Cabin No.', selectedCabin) +
-      rf('Payment Method', selectedPayment) +
       rf('From', from) +
       rf('To', to) +
       rf('Departure', depart) +
       (tripType === 'roundtrip' ? rf('Return Date', ret) : '') +
-      rf('No. of Passengers', pax);
+      rf('No. of Passengers', pax) +
+      rf('Fare per Person', fareLabel) +
+      rf('Payment Method', selectedPayment) +
+      rf('Total Amount Paid', `<span style="color:var(--red);font-weight:900;font-size:16px;">${fmt(totalFare)}</span>`, true);
 
     document.getElementById('confirmModal').classList.add('open');
     pendingBooking = null;
