@@ -1513,7 +1513,8 @@
     box-shadow: 0 8px 20px rgba(200,16,46,0.30);
     transition: background .2s, transform .15s;
   }
-  .blueprint-proceed:hover { background: var(--red-dark); transform: translateY(-1px); }
+  .blueprint-proceed:hover:not(:disabled) { background: var(--red-dark); transform: translateY(-1px); }
+  .blueprint-proceed:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
   /* =================== DECK PLAN =================== */
   .deck-plan { padding: 6px 2px; }
@@ -1548,6 +1549,7 @@
     font-size: 13px; font-weight: 700; color: #92400e; text-align: center; display: none;
   }
   .dp-selected-info.show { display: block; }
+  .dp-selected-info.complete { background: #dcfce7; border-color: #86efac; color: #166534; }
 
   /* =================== MOBILE =================== */
   @media (max-width: 720px) {
@@ -1967,14 +1969,14 @@
         </div>
 
         <div class="dp-selected-info" id="dpSelectedInfo">
-          &#9875; Cabin <span id="dpCabinNum">—</span> selected
+          <span id="dpCabinNum"></span>
         </div>
 
       </div>
     </div>
     <div class="blueprint-footer">
       <button class="blueprint-cancel" onclick="closeBlueprintModal()">Cancel</button>
-      <button class="blueprint-proceed" onclick="proceedToConfirm()">Proceed to Confirm &rarr;</button>
+      <button class="blueprint-proceed" id="blueprintProceedBtn" onclick="proceedToConfirm()" disabled>Proceed to Confirm &rarr;</button>
     </div>
   </div>
 </div>
@@ -2234,7 +2236,7 @@
   }
 
   let pendingBooking = null;
-  let selectedCabin = null;
+  let selectedCabins = [];
   let pendingPax = null;
   let selectedPayment = null;
 
@@ -2250,16 +2252,44 @@
 
   function selectCabin(el, num) {
     if (el.classList.contains('taken')) return;
-    document.querySelectorAll('.cabin.selected').forEach(c => {
-      c.classList.remove('selected');
-      c.classList.add('available');
-    });
-    el.classList.remove('available');
-    el.classList.add('selected');
-    selectedCabin = num;
+    const maxCabins = parseInt(pendingBooking.pax) || 1;
+
+    if (el.classList.contains('selected')) {
+      el.classList.remove('selected');
+      el.classList.add('available');
+      selectedCabins = selectedCabins.filter(c => c !== num);
+    } else {
+      if (selectedCabins.length >= maxCabins) return;
+      el.classList.remove('available');
+      el.classList.add('selected');
+      selectedCabins.push(num);
+    }
+    updateCabinInfo();
+  }
+
+  function updateCabinInfo() {
+    const maxCabins = parseInt(pendingBooking.pax) || 1;
+    const count = selectedCabins.length;
     const info = document.getElementById('dpSelectedInfo');
-    document.getElementById('dpCabinNum').textContent = num;
+    const btn = document.getElementById('blueprintProceedBtn');
+
+    if (count === 0) {
+      info.classList.remove('show', 'complete');
+      btn.disabled = true;
+      return;
+    }
     info.classList.add('show');
+    if (count < maxCabins) {
+      info.classList.remove('complete');
+      document.getElementById('dpCabinNum').textContent =
+        `&#9875; ${count} of ${maxCabins} cabin${maxCabins > 1 ? 's' : ''} selected — ${maxCabins - count} more needed`;
+      btn.disabled = true;
+    } else {
+      info.classList.add('complete');
+      document.getElementById('dpCabinNum').innerHTML =
+        `&#10003; All ${maxCabins} cabin${maxCabins > 1 ? 's' : ''} selected: <strong>${selectedCabins.join(', ')}</strong>`;
+      btn.disabled = false;
+    }
   }
 
   function submitBooking(e) {
@@ -2276,12 +2306,13 @@
     }
 
     pendingBooking = { from, to, depart, ret, pax };
-    selectedCabin = null;
+    selectedCabins = [];
     document.querySelectorAll('.cabin.selected').forEach(c => {
       c.classList.remove('selected');
       c.classList.add('available');
     });
-    document.getElementById('dpSelectedInfo').classList.remove('show');
+    document.getElementById('dpSelectedInfo').classList.remove('show', 'complete');
+    document.getElementById('blueprintProceedBtn').disabled = true;
     document.getElementById('blueprintModal').classList.add('open');
     return false;
   }
@@ -2292,10 +2323,8 @@
   }
 
   function proceedToConfirm() {
-    if (!selectedCabin) {
-      alert('Please select an available cabin before proceeding.');
-      return;
-    }
+    const maxCabins = parseInt(pendingBooking.pax) || 1;
+    if (selectedCabins.length < maxCabins) return;
     document.getElementById('blueprintModal').classList.remove('open');
     document.getElementById('paxModal').classList.add('open');
   }
@@ -2467,7 +2496,7 @@
 
     document.getElementById('receiptTripFields').innerHTML =
       rf('Trip Type', tripType === 'roundtrip' ? 'Round Trip' : 'One Way') +
-      rf('Cabin No.', selectedCabin) +
+      rf('Cabin(s)', selectedCabins.join(', ')) +
       rf('From', from) +
       rf('To', to) +
       rf('Departure', depart) +
