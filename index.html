@@ -1055,126 +1055,36 @@
   .blueprint-proceed:hover { background: var(--red-dark); transform: translateY(-1px); }
 
   /* =================== DECK PLAN =================== */
-  .deck-plan { padding: 16px 4px; }
+  .deck-plan { padding: 6px 2px; }
   .dp-legend {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-    padding: 12px 16px;
-    background: var(--bg-soft);
-    border-radius: 10px;
-    font-size: 12px;
-    font-weight: 700;
+    display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 12px; padding: 10px 14px;
+    background: var(--bg-soft); border-radius: 10px;
+    font-size: 12px; font-weight: 700;
   }
-  .dp-legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-  }
-  .dp-legend .dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 4px;
-    flex-shrink: 0;
-  }
-  .dot-avail   { background: #22c55e; }
-  .dot-taken   { background: #ef4444; }
-  .dot-sel     { background: #f59e0b; }
-
-  .deck-section { margin-bottom: 22px; }
+  .dp-legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .dp-legend .dot { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+  .dot-avail { background: #22c55e; }
+  .dot-taken { background: #ef4444; }
+  .dot-sel   { background: #f59e0b; }
+  .deck-section { margin-bottom: 14px; }
   .deck-name {
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: var(--white);
-    background: var(--ink);
-    padding: 6px 14px;
-    border-radius: 6px 6px 0 0;
-    display: inline-block;
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 2px; color: #fff; background: #1a2840;
+    padding: 5px 14px; border-radius: 6px 6px 0 0; display: inline-block;
   }
-  .deck-body {
-    border: 2px solid var(--ink);
-    border-radius: 0 8px 8px 8px;
-    padding: 14px 12px;
-    background: #fafafa;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .deck-row {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .cabin-box {
-    width: 46px;
-    height: 46px;
-    border-radius: 7px;
-    display: grid;
-    place-items: center;
-    font-size: 11px;
-    font-weight: 800;
-    border: 2px solid transparent;
-    transition: transform .15s, box-shadow .15s;
-    user-select: none;
-  }
-  .cabin-box.available {
-    background: #22c55e;
-    color: #fff;
-    cursor: pointer;
-    border-color: #16a34a;
-  }
-  .cabin-box.available:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 14px rgba(34,197,94,0.4);
-  }
-  .cabin-box.taken {
-    background: #ef4444;
-    color: #fff;
-    cursor: not-allowed;
-    border-color: #dc2626;
-    opacity: 0.85;
-  }
-  .cabin-box.selected {
-    background: #f59e0b;
-    color: #fff;
-    cursor: pointer;
-    border-color: #d97706;
-    transform: scale(1.08);
-    box-shadow: 0 6px 16px rgba(245,158,11,0.5);
-  }
-  .deck-divider {
-    width: 2px;
-    height: 40px;
-    background: var(--line);
-    border-radius: 2px;
-    margin: 0 4px;
-    flex-shrink: 0;
-  }
-  .deck-area-label {
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--muted);
-    text-align: center;
-    padding: 4px 8px;
-    background: var(--line);
-    border-radius: 6px;
-    white-space: nowrap;
-  }
+  .deck-svg { width: 100%; display: block; }
+  .deck-svg .cabin { cursor: pointer; }
+  .deck-svg .cabin.taken { cursor: not-allowed; }
+  .deck-svg .cabin.available rect { fill: #22c55e; stroke: #16a34a; stroke-width: 2; }
+  .deck-svg .cabin.taken rect    { fill: #ef4444; stroke: #dc2626; stroke-width: 2; }
+  .deck-svg .cabin.selected rect { fill: #f59e0b; stroke: #d97706; stroke-width: 2.5; filter: drop-shadow(0 3px 6px rgba(245,158,11,.5)); }
+  .deck-svg .cabin.available:hover rect { fill: #16a34a; }
+  .deck-svg .cabin text { font-family: 'Inter',sans-serif; font-size: 11px; font-weight: 800; fill: white; pointer-events: none; dominant-baseline: central; text-anchor: middle; }
   .dp-selected-info {
-    margin-top: 14px;
-    padding: 10px 16px;
-    background: #fffbeb;
-    border: 1.5px solid #f59e0b;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #92400e;
-    text-align: center;
-    display: none;
+    margin-top: 10px; padding: 10px 16px;
+    background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 8px;
+    font-size: 13px; font-weight: 700; color: #92400e; text-align: center; display: none;
   }
   .dp-selected-info.show { display: block; }
 
@@ -1491,104 +1401,108 @@
     <div class="blueprint-img-wrap">
       <div class="deck-plan">
 
-        <!-- Legend -->
         <div class="dp-legend">
-          <span><span class="dot dot-avail"></span> Available</span>
-          <span><span class="dot dot-taken"></span> Taken</span>
-          <span><span class="dot dot-sel"></span> Selected</span>
+          <span><span class="dot dot-avail"></span>Available</span>
+          <span><span class="dot dot-taken"></span>Taken</span>
+          <span><span class="dot dot-sel"></span>Selected</span>
         </div>
 
         <!-- CAROLINA DECK -->
         <div class="deck-section">
           <div class="deck-name">Carolina Deck</div>
-          <div class="deck-body">
-            <div class="deck-row">
-              <div class="cabin-box taken"    onclick="selectCabin(this,'306')">306</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'308')">308</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'310')">310</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'312')">312</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'314')">314</div>
-              <div class="deck-divider"></div>
-              <div class="deck-area-label">Library<br>Lounge</div>
-              <div class="deck-divider"></div>
-              <div class="cabin-box available" onclick="selectCabin(this,'316')">316</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'318')">318</div>
-            </div>
-            <div class="deck-row">
-              <div class="cabin-box available" onclick="selectCabin(this,'301')">301</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'305')">305</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'307')">307</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'309')">309</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'311')">311</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'313')">313</div>
-              <div class="deck-divider"></div>
-              <div class="cabin-box available" onclick="selectCabin(this,'315')">315</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'317')">317</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'319')">319</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'321')">321</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'323')">323</div>
-            </div>
-          </div>
+          <svg viewBox="0 0 760 192" class="deck-svg" xmlns="http://www.w3.org/2000/svg">
+            <path d="M28,96 L62,14 L732,14 L732,178 L62,178 Z" fill="#eef4f9" stroke="#1a2840" stroke-width="2.5"/>
+            <rect x="34" y="17" width="68" height="158" rx="4" fill="#cddaeb" stroke="#7a9ab8" stroke-width="1.5"/>
+            <text x="68" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" font-weight="700" fill="#334155">Pilot</text>
+            <text x="68" y="102" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" font-weight="700" fill="#334155">house</text>
+            <rect x="384" y="44" width="55" height="66" rx="4" fill="#cddaeb" stroke="#7a9ab8" stroke-width="1.5"/>
+            <text x="411" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" font-weight="700" fill="#334155">Library</text>
+            <text x="411" y="85" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" font-weight="700" fill="#334155">Lounge</text>
+            <line x1="110" y1="96" x2="382" y2="96" stroke="#a0b4c8" stroke-width="1" stroke-dasharray="5,4"/>
+            <line x1="441" y1="96" x2="730" y2="96" stroke="#a0b4c8" stroke-width="1" stroke-dasharray="5,4"/>
+            <text x="240" y="91" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" font-weight="700" fill="#a0b4c8" letter-spacing="2">CORRIDOR</text>
+            <text x="585" y="91" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" font-weight="700" fill="#a0b4c8" letter-spacing="2">CORRIDOR</text>
+            <g class="cabin taken"    onclick="selectCabin(this,'306')"><rect x="110" y="17" width="48" height="52" rx="5"/><text x="134" y="43">306</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'308')"><rect x="163" y="17" width="48" height="52" rx="5"/><text x="187" y="43">308</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'310')"><rect x="216" y="17" width="48" height="52" rx="5"/><text x="240" y="43">310</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'312')"><rect x="269" y="17" width="48" height="52" rx="5"/><text x="293" y="43">312</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'314')"><rect x="322" y="17" width="48" height="52" rx="5"/><text x="346" y="43">314</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'316')"><rect x="448" y="17" width="48" height="52" rx="5"/><text x="472" y="43">316</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'318')"><rect x="501" y="17" width="48" height="52" rx="5"/><text x="525" y="43">318</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'301')"><rect x="110" y="123" width="48" height="52" rx="5"/><text x="134" y="149">301</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'305')"><rect x="163" y="123" width="48" height="52" rx="5"/><text x="187" y="149">305</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'307')"><rect x="216" y="123" width="48" height="52" rx="5"/><text x="240" y="149">307</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'309')"><rect x="269" y="123" width="48" height="52" rx="5"/><text x="293" y="149">309</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'311')"><rect x="322" y="123" width="48" height="52" rx="5"/><text x="346" y="149">311</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'313')"><rect x="375" y="123" width="48" height="52" rx="5"/><text x="399" y="149">313</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'315')"><rect x="448" y="123" width="48" height="52" rx="5"/><text x="472" y="149">315</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'317')"><rect x="501" y="123" width="48" height="52" rx="5"/><text x="525" y="149">317</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'319')"><rect x="554" y="123" width="48" height="52" rx="5"/><text x="578" y="149">319</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'321')"><rect x="607" y="123" width="48" height="52" rx="5"/><text x="631" y="149">321</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'323')"><rect x="660" y="123" width="48" height="52" rx="5"/><text x="684" y="149">323</text></g>
+          </svg>
         </div>
 
         <!-- LOUNGE DECK -->
         <div class="deck-section">
           <div class="deck-name">Lounge Deck</div>
-          <div class="deck-body">
-            <div class="deck-row">
-              <div class="cabin-box available" onclick="selectCabin(this,'202')">202</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'204')">204</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'206')">206</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'208')">208</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'210')">210</div>
-              <div class="deck-divider"></div>
-              <div class="deck-area-label">Midship<br>Lounge</div>
-              <div class="deck-divider"></div>
-              <div class="cabin-box available" onclick="selectCabin(this,'212')">212</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'214')">214</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'216')">216</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'218')">218</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'220')">220</div>
-            </div>
-            <div class="deck-row">
-              <div class="cabin-box available" onclick="selectCabin(this,'203')">203</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'205')">205</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'207')">207</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'209')">209</div>
-              <div class="deck-divider"></div>
-              <div class="deck-divider"></div>
-              <div class="cabin-box available" onclick="selectCabin(this,'213')">213</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'215')">215</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'217')">217</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'219')">219</div>
-            </div>
-          </div>
+          <svg viewBox="0 0 775 192" class="deck-svg" xmlns="http://www.w3.org/2000/svg">
+            <path d="M28,96 L62,14 L747,14 L747,178 L62,178 Z" fill="#eef4f9" stroke="#1a2840" stroke-width="2.5"/>
+            <rect x="34" y="17" width="90" height="158" rx="4" fill="#cddaeb" stroke="#7a9ab8" stroke-width="1.5"/>
+            <text x="79" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" font-weight="700" fill="#334155">Chesapeake</text>
+            <text x="79" y="101" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" font-weight="700" fill="#334155">Lounge</text>
+            <rect x="404" y="44" width="58" height="66" rx="4" fill="#cddaeb" stroke="#7a9ab8" stroke-width="1.5"/>
+            <text x="433" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" font-weight="700" fill="#334155">Midship</text>
+            <text x="433" y="85" text-anchor="middle" font-family="Inter,sans-serif" font-size="9" font-weight="700" fill="#334155">Lounge</text>
+            <line x1="132" y1="96" x2="402" y2="96" stroke="#a0b4c8" stroke-width="1" stroke-dasharray="5,4"/>
+            <line x1="464" y1="96" x2="745" y2="96" stroke="#a0b4c8" stroke-width="1" stroke-dasharray="5,4"/>
+            <text x="265" y="91" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" font-weight="700" fill="#a0b4c8" letter-spacing="2">CORRIDOR</text>
+            <text x="600" y="91" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" font-weight="700" fill="#a0b4c8" letter-spacing="2">CORRIDOR</text>
+            <g class="cabin available" onclick="selectCabin(this,'202')"><rect x="132" y="17" width="48" height="52" rx="5"/><text x="156" y="43">202</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'204')"><rect x="185" y="17" width="48" height="52" rx="5"/><text x="209" y="43">204</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'206')"><rect x="238" y="17" width="48" height="52" rx="5"/><text x="262" y="43">206</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'208')"><rect x="291" y="17" width="48" height="52" rx="5"/><text x="315" y="43">208</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'210')"><rect x="344" y="17" width="48" height="52" rx="5"/><text x="368" y="43">210</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'212')"><rect x="464" y="17" width="48" height="52" rx="5"/><text x="488" y="43">212</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'214')"><rect x="517" y="17" width="48" height="52" rx="5"/><text x="541" y="43">214</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'216')"><rect x="570" y="17" width="48" height="52" rx="5"/><text x="594" y="43">216</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'218')"><rect x="623" y="17" width="48" height="52" rx="5"/><text x="647" y="43">218</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'220')"><rect x="676" y="17" width="48" height="52" rx="5"/><text x="700" y="43">220</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'203')"><rect x="132" y="123" width="48" height="52" rx="5"/><text x="156" y="149">203</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'205')"><rect x="185" y="123" width="48" height="52" rx="5"/><text x="209" y="149">205</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'207')"><rect x="238" y="123" width="48" height="52" rx="5"/><text x="262" y="149">207</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'209')"><rect x="291" y="123" width="48" height="52" rx="5"/><text x="315" y="149">209</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'213')"><rect x="464" y="123" width="48" height="52" rx="5"/><text x="488" y="149">213</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'215')"><rect x="517" y="123" width="48" height="52" rx="5"/><text x="541" y="149">215</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'217')"><rect x="570" y="123" width="48" height="52" rx="5"/><text x="594" y="149">217</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'219')"><rect x="623" y="123" width="48" height="52" rx="5"/><text x="647" y="149">219</text></g>
+          </svg>
         </div>
 
         <!-- MAIN DECK -->
         <div class="deck-section">
           <div class="deck-name">Main Deck</div>
-          <div class="deck-body">
-            <div class="deck-row">
-              <div class="cabin-box available" onclick="selectCabin(this,'104')">104</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'106')">106</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'108')">108</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'110')">110</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'112')">112</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'114')">114</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'116')">116</div>
-              <div class="deck-divider"></div>
-              <div class="deck-area-label">Dining<br>Room</div>
-            </div>
-            <div class="deck-row">
-              <div class="cabin-box available" onclick="selectCabin(this,'105')">105</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'107')">107</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'109')">109</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'111')">111</div>
-              <div class="cabin-box taken"    onclick="selectCabin(this,'113')">113</div>
-              <div class="cabin-box available" onclick="selectCabin(this,'115')">115</div>
-            </div>
-          </div>
+          <svg viewBox="0 0 700 192" class="deck-svg" xmlns="http://www.w3.org/2000/svg">
+            <path d="M28,96 L62,14 L672,14 L672,178 L62,178 Z" fill="#eef4f9" stroke="#1a2840" stroke-width="2.5"/>
+            <rect x="444" y="17" width="214" height="158" rx="4" fill="#cddaeb" stroke="#7a9ab8" stroke-width="1.5"/>
+            <text x="551" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="700" fill="#334155">Dining</text>
+            <text x="551" y="103" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="700" fill="#334155">Room</text>
+            <line x1="62" y1="96" x2="442" y2="96" stroke="#a0b4c8" stroke-width="1" stroke-dasharray="5,4"/>
+            <text x="250" y="91" text-anchor="middle" font-family="Inter,sans-serif" font-size="8" font-weight="700" fill="#a0b4c8" letter-spacing="2">CORRIDOR</text>
+            <g class="cabin available" onclick="selectCabin(this,'104')"><rect x="66" y="17" width="48" height="52" rx="5"/><text x="90" y="43">104</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'106')"><rect x="119" y="17" width="48" height="52" rx="5"/><text x="143" y="43">106</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'108')"><rect x="172" y="17" width="48" height="52" rx="5"/><text x="196" y="43">108</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'110')"><rect x="225" y="17" width="48" height="52" rx="5"/><text x="249" y="43">110</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'112')"><rect x="278" y="17" width="48" height="52" rx="5"/><text x="302" y="43">112</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'114')"><rect x="331" y="17" width="48" height="52" rx="5"/><text x="355" y="43">114</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'116')"><rect x="384" y="17" width="48" height="52" rx="5"/><text x="408" y="43">116</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'105')"><rect x="66" y="123" width="48" height="52" rx="5"/><text x="90" y="149">105</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'107')"><rect x="119" y="123" width="48" height="52" rx="5"/><text x="143" y="149">107</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'109')"><rect x="172" y="123" width="48" height="52" rx="5"/><text x="196" y="149">109</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'111')"><rect x="225" y="123" width="48" height="52" rx="5"/><text x="249" y="149">111</text></g>
+            <g class="cabin taken"    onclick="selectCabin(this,'113')"><rect x="278" y="123" width="48" height="52" rx="5"/><text x="302" y="149">113</text></g>
+            <g class="cabin available" onclick="selectCabin(this,'115')"><rect x="331" y="123" width="48" height="52" rx="5"/><text x="355" y="149">115</text></g>
+          </svg>
         </div>
 
         <div class="dp-selected-info" id="dpSelectedInfo">
@@ -1675,7 +1589,7 @@
 
   function selectCabin(el, num) {
     if (el.classList.contains('taken')) return;
-    document.querySelectorAll('.cabin-box.selected').forEach(c => {
+    document.querySelectorAll('.cabin.selected').forEach(c => {
       c.classList.remove('selected');
       c.classList.add('available');
     });
@@ -1702,7 +1616,7 @@
 
     pendingBooking = { from, to, depart, ret, pax };
     selectedCabin = null;
-    document.querySelectorAll('.cabin-box.selected').forEach(c => {
+    document.querySelectorAll('.cabin.selected').forEach(c => {
       c.classList.remove('selected');
       c.classList.add('available');
     });
