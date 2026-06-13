@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fares – KSLi Kho Shipping Lines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red:        #c8102e;
+    --red-dark:   #9a0c23;
+    --red-soft:   #ffe8eb;
+    --white:      #ffffff;
+    --ink:        #1a1a1a;
+    --ink-soft:   #4a4a4a;
+    --muted:      #8a8a8a;
+    --line:       #ececec;
+    --bg-soft:    #f5f6f7;
+    --green:      #16a34a;
+    --green-soft: #dcfce7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    background: var(--white);
+    line-height: 1.55;
+    overflow-x: hidden;
+  }
+
+  /* =================== HEADER =================== */
+  .header-bar {
+    background: var(--white);
+    box-shadow: 0 2px 18px rgba(0,0,0,0.08);
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+  }
+  .nav {
+    max-width: 1265px;
+    margin: 0 auto;
+    padding: 12px 31px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .brand { display: flex; align-items: center; gap: 18px; text-decoration: none; }
+  .brand-mark {
+    width: 84px; height: 84px;
+    border-radius: 50%;
+    background: var(--white);
+    display: grid; place-items: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.20);
+    transition: transform .25s ease;
+    overflow: hidden;
+  }
+  .brand:hover .brand-mark { transform: rotate(-8deg) scale(1.05); }
+  .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
+  .brand-text { color: var(--red); font-weight: 900; font-size: 52px; line-height: 1; font-family: 'Inter', sans-serif; }
+  .brand-text small {
+    display: block; font-size: 14px; font-weight: 700;
+    letter-spacing: 4px; text-transform: uppercase; margin-top: 5px; color: var(--red);
+  }
+  .nav-links { display: flex; align-items: center; gap: 42px; }
+  .nav-links a {
+    color: #333; text-decoration: none; font-weight: 600; font-size: 16px;
+    transition: color .2s; position: relative; padding: 6px 0;
+  }
+  .nav-links a:hover { color: var(--red); }
+  .nav-links a::after {
+    content: ""; position: absolute; left: 50%; bottom: 0;
+    width: 0; height: 2.5px; background: var(--red); border-radius: 2px;
+    transition: width .3s, left .3s;
+  }
+  .nav-links a:hover::after,
+  .nav-links a.active::after { width: 100%; left: 0; }
+  .nav-links a.active { color: var(--red); }
+  .nav-cta {
+    background: var(--red) !important; color: var(--white) !important;
+    padding: 11px 26px !important; border-radius: 30px; font-weight: 700 !important;
+    box-shadow: 0 8px 20px rgba(200,16,46,0.30); transition: transform .15s, background .2s !important;
+  }
+  .nav-cta:hover { background: var(--red-dark) !important; transform: translateY(-2px); }
+  .nav-cta::after { display: none !important; }
+  .burger {
+    display: none; background: var(--red); border: 0; color: var(--white);
+    font-size: 22px; cursor: pointer; width: 44px; height: 44px; border-radius: 10px;
+  }
+  @media (max-width: 1100px) {
+    .nav-links { gap: 26px; }
+    .nav-links a { font-size: 14px; }
+    .brand-text { font-size: 38px; }
+    .brand-text small { font-size: 11px; letter-spacing: 2.5px; }
+    .brand-mark { width: 70px; height: 70px; }
+  }
+  @media (max-width: 900px) {
+    .nav { padding: 10px 16px; }
+    .nav-links { display: none; }
+    .burger { display: grid; place-items: center; }
+    .brand-text { font-size: 28px; }
+    .brand-text small { font-size: 8px; letter-spacing: 1.8px; }
+    .brand-mark { width: 54px; height: 54px; }
+  }
+
+  /* =================== PAGE HERO =================== */
+  .page-hero {
+    margin-top: 108px;
+    background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+    color: var(--white);
+    padding: 60px 24px 56px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-hero::before {
+    content: ""; position: absolute; top: -60%; right: -8%;
+    width: 420px; height: 420px;
+    background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%);
+    pointer-events: none;
+  }
+  .eyebrow {
+    font-size: 12px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 3px; opacity: 0.85; margin-bottom: 12px;
+  }
+  .page-hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 800; margin-bottom: 14px;
+  }
+  .page-hero p { font-size: 16px; opacity: 0.85; max-width: 560px; margin: 0 auto; }
+
+  /* =================== CONTENT =================== */
+  .content {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+  }
+
+  /* Discount banner */
+  .discount-banner {
+    background: var(--green-soft);
+    border: 1.5px solid #86efac;
+    border-radius: 14px;
+    padding: 20px 26px;
+    margin-bottom: 48px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .discount-icon { font-size: 32px; flex-shrink: 0; line-height: 1; }
+  .discount-text h3 {
+    font-size: 15px; font-weight: 800; color: var(--green); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .discount-text p { font-size: 14px; color: #166534; line-height: 1.6; }
+  .id-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .id-chip {
+    background: #fff; border: 1.5px solid #86efac; color: #166534;
+    font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px;
+  }
+
+  /* Section heading */
+  .section-heading {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px; font-weight: 700;
+    color: var(--ink); margin-bottom: 28px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--line);
+  }
+  .section-heading span { color: var(--red); }
+
+  /* Fare grid */
+  .fare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 640px) { .fare-grid { grid-template-columns: 1fr; } }
+
+  .fare-card {
+    background: var(--white);
+    border: 1.5px solid var(--line);
+    border-radius: 16px;
+    padding: 24px 26px;
+    transition: box-shadow .2s, transform .2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .fare-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.10); transform: translateY(-3px); }
+  .fare-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--red), var(--red-dark));
+    border-radius: 16px 16px 0 0;
+  }
+
+  .route-label {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 8px;
+  }
+  .route-name {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 18px; font-weight: 800; color: var(--ink);
+    margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .route-arrow {
+    color: var(--red); font-size: 20px; font-weight: 900; line-height: 1;
+  }
+
+  .fare-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-top: 1px solid var(--line);
+  }
+  .fare-row-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .fare-amount {
+    font-size: 20px; font-weight: 800; color: var(--red);
+    font-variant-numeric: tabular-nums;
+  }
+  .fare-amount small { font-size: 13px; font-weight: 600; }
+  .fare-discounted { color: var(--green); }
+  .discount-badge {
+    display: inline-block;
+    background: var(--green-soft);
+    color: var(--green);
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  /* Note */
+  .fare-note {
+    margin-top: 36px;
+    background: var(--bg-soft);
+    border-left: 4px solid var(--red);
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+  }
+  .fare-note strong { color: var(--ink); }
+
+  /* =================== FOOTER =================== */
+  footer {
+    background: var(--ink);
+    color: #ccc;
+    padding: 40px 24px 24px;
+    text-align: center;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="header-bar">
+  <nav class="nav">
+    <a href="index.html" class="brand">
+      <div class="brand-mark">
+        <img src="KSL%20logo.png" alt="KSLi Kho Shipping Lines logo" />
+      </div>
+      <div class="brand-text">
+        KSL
+        <small>Kho Shipping Lines Incorporated</small>
+      </div>
+    </a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="schedules.html">Schedules</a>
+      <a href="fares.html" class="active">Fares</a>
+      <a href="index.html#routes">Destinations</a>
+      <a href="index.html#contact">Help</a>
+      <a href="index.html#bookingForm" class="nav-cta">Book Now</a>
+    </div>
+    <button class="burger" aria-label="Menu">&#9776;</button>
+  </nav>
+</header>
+
+<!-- ============ PAGE HERO ============ -->
+<div class="page-hero">
+  <div class="eyebrow">&#9875; KSLi Kho Shipping Lines</div>
+  <h1>Passenger Fares</h1>
+  <p>Transparent and affordable fares for all routes. Discounts available for qualified passengers.</p>
+</div>
+
+<!-- ============ CONTENT ============ -->
+<div class="content">
+
+  <!-- Discount Banner -->
+  <div class="discount-banner">
+    <div class="discount-icon">🎟️</div>
+    <div class="discount-text">
+      <h3>2% Discount — Special Passenger Categories</h3>
+      <p>The following valid government-issued IDs qualify for a <strong>2% discount</strong> on all routes. Present your original ID upon boarding for verification.</p>
+      <div class="id-chips">
+        <span class="id-chip">🎓 Student ID</span>
+        <span class="id-chip">👴 Senior Citizen ID</span>
+        <span class="id-chip">♿ PWD ID</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-heading">Route Fares <span>&amp; Discounts</span></div>
+
+  <div class="fare-grid">
+
+    <!-- Mintac → Calbayog -->
+    <div class="fare-card">
+      <div class="route-label">Route</div>
+      <div class="route-name">
+        Mintac <span class="route-arrow">&#8594;</span> Calbayog
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">Regular Fare</span>
+        <span class="fare-amount"><small>₱</small>850.00</span>
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">
+          Discounted Fare
+          <span class="discount-badge">2% OFF</span>
+        </span>
+        <span class="fare-amount fare-discounted"><small>₱</small>833.00</span>
+      </div>
+    </div>
+
+    <!-- Calbayog → Cebu -->
+    <div class="fare-card">
+      <div class="route-label">Route</div>
+      <div class="route-name">
+        Calbayog <span class="route-arrow">&#8594;</span> Cebu
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">Regular Fare</span>
+        <span class="fare-amount"><small>₱</small>1,300.00</span>
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">
+          Discounted Fare
+          <span class="discount-badge">2% OFF</span>
+        </span>
+        <span class="fare-amount fare-discounted"><small>₱</small>1,274.00</span>
+      </div>
+    </div>
+
+    <!-- Mintac → Cebu -->
+    <div class="fare-card">
+      <div class="route-label">Route</div>
+      <div class="route-name">
+        Mintac <span class="route-arrow">&#8594;</span> Cebu
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">Regular Fare</span>
+        <span class="fare-amount"><small>₱</small>1,430.00</span>
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">
+          Discounted Fare
+          <span class="discount-badge">2% OFF</span>
+        </span>
+        <span class="fare-amount fare-discounted"><small>₱</small>1,401.40</span>
+      </div>
+    </div>
+
+    <!-- Cebu → Calbayog -->
+    <div class="fare-card">
+      <div class="route-label">Route</div>
+      <div class="route-name">
+        Cebu <span class="route-arrow">&#8594;</span> Calbayog
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">Regular Fare</span>
+        <span class="fare-amount"><small>₱</small>1,250.00</span>
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">
+          Discounted Fare
+          <span class="discount-badge">2% OFF</span>
+        </span>
+        <span class="fare-amount fare-discounted"><small>₱</small>1,225.00</span>
+      </div>
+    </div>
+
+    <!-- Calbayog → Mintac -->
+    <div class="fare-card">
+      <div class="route-label">Route</div>
+      <div class="route-name">
+        Calbayog <span class="route-arrow">&#8594;</span> Mintac
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">Regular Fare</span>
+        <span class="fare-amount"><small>₱</small>650.00</span>
+      </div>
+      <div class="fare-row">
+        <span class="fare-row-label">
+          Discounted Fare
+          <span class="discount-badge">2% OFF</span>
+        </span>
+        <span class="fare-amount fare-discounted"><small>₱</small>637.00</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="fare-note">
+    <strong>Note:</strong> All fares are in Philippine Peso (₱) and are subject to change without prior notice.
+    Discounted fares apply only to passengers presenting a valid and original ID (Student ID, Senior Citizen ID, or PWD ID) upon boarding.
+    Fare does not include port terminal fees unless otherwise stated.
+  </div>
+
+</div>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  &copy; 2026 KSLi Kho Shipping Lines Incorporated. All rights reserved.
+</footer>
+
+</body>
+</html>
