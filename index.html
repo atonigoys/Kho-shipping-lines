@@ -984,7 +984,7 @@
     background: var(--white);
     border-radius: 18px;
     overflow: hidden;
-    max-width: 620px;
+    max-width: 780px;
     width: 100%;
     border-top: 6px solid var(--red);
     box-shadow: 0 32px 80px rgba(0,0,0,0.4);
@@ -1053,6 +1053,130 @@
     transition: background .2s, transform .15s;
   }
   .blueprint-proceed:hover { background: var(--red-dark); transform: translateY(-1px); }
+
+  /* =================== DECK PLAN =================== */
+  .deck-plan { padding: 16px 4px; }
+  .dp-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: var(--bg-soft);
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .dp-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .dp-legend .dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .dot-avail   { background: #22c55e; }
+  .dot-taken   { background: #ef4444; }
+  .dot-sel     { background: #f59e0b; }
+
+  .deck-section { margin-bottom: 22px; }
+  .deck-name {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--white);
+    background: var(--ink);
+    padding: 6px 14px;
+    border-radius: 6px 6px 0 0;
+    display: inline-block;
+  }
+  .deck-body {
+    border: 2px solid var(--ink);
+    border-radius: 0 8px 8px 8px;
+    padding: 14px 12px;
+    background: #fafafa;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .deck-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .cabin-box {
+    width: 46px;
+    height: 46px;
+    border-radius: 7px;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 800;
+    border: 2px solid transparent;
+    transition: transform .15s, box-shadow .15s;
+    user-select: none;
+  }
+  .cabin-box.available {
+    background: #22c55e;
+    color: #fff;
+    cursor: pointer;
+    border-color: #16a34a;
+  }
+  .cabin-box.available:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(34,197,94,0.4);
+  }
+  .cabin-box.taken {
+    background: #ef4444;
+    color: #fff;
+    cursor: not-allowed;
+    border-color: #dc2626;
+    opacity: 0.85;
+  }
+  .cabin-box.selected {
+    background: #f59e0b;
+    color: #fff;
+    cursor: pointer;
+    border-color: #d97706;
+    transform: scale(1.08);
+    box-shadow: 0 6px 16px rgba(245,158,11,0.5);
+  }
+  .deck-divider {
+    width: 2px;
+    height: 40px;
+    background: var(--line);
+    border-radius: 2px;
+    margin: 0 4px;
+    flex-shrink: 0;
+  }
+  .deck-area-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: center;
+    padding: 4px 8px;
+    background: var(--line);
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .dp-selected-info {
+    margin-top: 14px;
+    padding: 10px 16px;
+    background: #fffbeb;
+    border: 1.5px solid #f59e0b;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #92400e;
+    text-align: center;
+    display: none;
+  }
+  .dp-selected-info.show { display: block; }
 
   /* =================== MOBILE =================== */
   @media (max-width: 720px) {
@@ -1365,7 +1489,113 @@
       <p>Review the vessel layout before confirming your booking.</p>
     </div>
     <div class="blueprint-img-wrap">
-      <img src="ship-blueprint.jpg" alt="Ship deck plan blueprint" />
+      <div class="deck-plan">
+
+        <!-- Legend -->
+        <div class="dp-legend">
+          <span><span class="dot dot-avail"></span> Available</span>
+          <span><span class="dot dot-taken"></span> Taken</span>
+          <span><span class="dot dot-sel"></span> Selected</span>
+        </div>
+
+        <!-- CAROLINA DECK -->
+        <div class="deck-section">
+          <div class="deck-name">Carolina Deck</div>
+          <div class="deck-body">
+            <div class="deck-row">
+              <div class="cabin-box taken"    onclick="selectCabin(this,'306')">306</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'308')">308</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'310')">310</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'312')">312</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'314')">314</div>
+              <div class="deck-divider"></div>
+              <div class="deck-area-label">Library<br>Lounge</div>
+              <div class="deck-divider"></div>
+              <div class="cabin-box available" onclick="selectCabin(this,'316')">316</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'318')">318</div>
+            </div>
+            <div class="deck-row">
+              <div class="cabin-box available" onclick="selectCabin(this,'301')">301</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'305')">305</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'307')">307</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'309')">309</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'311')">311</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'313')">313</div>
+              <div class="deck-divider"></div>
+              <div class="cabin-box available" onclick="selectCabin(this,'315')">315</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'317')">317</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'319')">319</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'321')">321</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'323')">323</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOUNGE DECK -->
+        <div class="deck-section">
+          <div class="deck-name">Lounge Deck</div>
+          <div class="deck-body">
+            <div class="deck-row">
+              <div class="cabin-box available" onclick="selectCabin(this,'202')">202</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'204')">204</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'206')">206</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'208')">208</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'210')">210</div>
+              <div class="deck-divider"></div>
+              <div class="deck-area-label">Midship<br>Lounge</div>
+              <div class="deck-divider"></div>
+              <div class="cabin-box available" onclick="selectCabin(this,'212')">212</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'214')">214</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'216')">216</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'218')">218</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'220')">220</div>
+            </div>
+            <div class="deck-row">
+              <div class="cabin-box available" onclick="selectCabin(this,'203')">203</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'205')">205</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'207')">207</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'209')">209</div>
+              <div class="deck-divider"></div>
+              <div class="deck-divider"></div>
+              <div class="cabin-box available" onclick="selectCabin(this,'213')">213</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'215')">215</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'217')">217</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'219')">219</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MAIN DECK -->
+        <div class="deck-section">
+          <div class="deck-name">Main Deck</div>
+          <div class="deck-body">
+            <div class="deck-row">
+              <div class="cabin-box available" onclick="selectCabin(this,'104')">104</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'106')">106</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'108')">108</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'110')">110</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'112')">112</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'114')">114</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'116')">116</div>
+              <div class="deck-divider"></div>
+              <div class="deck-area-label">Dining<br>Room</div>
+            </div>
+            <div class="deck-row">
+              <div class="cabin-box available" onclick="selectCabin(this,'105')">105</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'107')">107</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'109')">109</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'111')">111</div>
+              <div class="cabin-box taken"    onclick="selectCabin(this,'113')">113</div>
+              <div class="cabin-box available" onclick="selectCabin(this,'115')">115</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dp-selected-info" id="dpSelectedInfo">
+          &#9875; Cabin <span id="dpCabinNum">—</span> selected
+        </div>
+
+      </div>
     </div>
     <div class="blueprint-footer">
       <button class="blueprint-cancel" onclick="closeBlueprintModal()">Cancel</button>
@@ -1441,6 +1671,21 @@
   }
 
   let pendingBooking = null;
+  let selectedCabin = null;
+
+  function selectCabin(el, num) {
+    if (el.classList.contains('taken')) return;
+    document.querySelectorAll('.cabin-box.selected').forEach(c => {
+      c.classList.remove('selected');
+      c.classList.add('available');
+    });
+    el.classList.remove('available');
+    el.classList.add('selected');
+    selectedCabin = num;
+    const info = document.getElementById('dpSelectedInfo');
+    document.getElementById('dpCabinNum').textContent = num;
+    info.classList.add('show');
+  }
 
   function submitBooking(e) {
     e.preventDefault();
@@ -1456,6 +1701,12 @@
     }
 
     pendingBooking = { from, to, depart, ret, pax };
+    selectedCabin = null;
+    document.querySelectorAll('.cabin-box.selected').forEach(c => {
+      c.classList.remove('selected');
+      c.classList.add('available');
+    });
+    document.getElementById('dpSelectedInfo').classList.remove('show');
     document.getElementById('blueprintModal').classList.add('open');
     return false;
   }
@@ -1466,6 +1717,10 @@
   }
 
   function proceedToConfirm() {
+    if (!selectedCabin) {
+      alert('Please select an available cabin before proceeding.');
+      return;
+    }
     document.getElementById('blueprintModal').classList.remove('open');
     const { from, to, depart, ret, pax } = pendingBooking;
     const summary = `
@@ -1475,6 +1730,7 @@
       <div><strong>Departure:</strong> ${depart}</div>
       ${tripType === 'roundtrip' ? `<div><strong>Return:</strong> ${ret}</div>` : ''}
       <div><strong>Passengers:</strong> ${pax}</div>
+      <div><strong>Cabin:</strong> ${selectedCabin}</div>
     `;
     document.getElementById('modalSummary').innerHTML = summary;
     document.getElementById('confirmModal').classList.add('open');
