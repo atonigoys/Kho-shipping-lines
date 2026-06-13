@@ -967,6 +967,93 @@
     font-family: inherit;
   }
 
+  /* =================== BLUEPRINT MODAL =================== */
+  .blueprint-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(6px);
+  }
+  .blueprint-modal.open { display: flex; }
+  .blueprint-card {
+    background: var(--white);
+    border-radius: 18px;
+    overflow: hidden;
+    max-width: 620px;
+    width: 100%;
+    border-top: 6px solid var(--red);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.4);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .blueprint-header {
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .blueprint-header h3 {
+    font-family: 'Playfair Display', serif;
+    color: var(--red);
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+  .blueprint-header p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .blueprint-img-wrap {
+    overflow-y: auto;
+    flex: 1;
+    padding: 16px 24px;
+    background: #f8f8f8;
+  }
+  .blueprint-img-wrap img {
+    width: 100%;
+    display: block;
+    border-radius: 8px;
+  }
+  .blueprint-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+  .blueprint-cancel {
+    background: transparent;
+    border: 2px solid var(--line);
+    color: var(--ink-soft);
+    padding: 11px 24px;
+    border-radius: 28px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    transition: border-color .2s;
+  }
+  .blueprint-cancel:hover { border-color: var(--muted); }
+  .blueprint-proceed {
+    background: var(--red);
+    color: var(--white);
+    border: 0;
+    padding: 11px 28px;
+    border-radius: 28px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    box-shadow: 0 8px 20px rgba(200,16,46,0.30);
+    transition: background .2s, transform .15s;
+  }
+  .blueprint-proceed:hover { background: var(--red-dark); transform: translateY(-1px); }
+
   /* =================== MOBILE =================== */
   @media (max-width: 720px) {
     .od-grid { grid-template-columns: 1fr; gap: 18px; }
@@ -1270,6 +1357,23 @@
   </div>
 </footer>
 
+<!-- ============ BLUEPRINT MODAL ============ -->
+<div class="blueprint-modal" id="blueprintModal">
+  <div class="blueprint-card">
+    <div class="blueprint-header">
+      <h3>&#9875; Ship Deck Plan</h3>
+      <p>Review the vessel layout before confirming your booking.</p>
+    </div>
+    <div class="blueprint-img-wrap">
+      <img src="ship-blueprint.jpg" alt="Ship deck plan blueprint" />
+    </div>
+    <div class="blueprint-footer">
+      <button class="blueprint-cancel" onclick="closeBlueprintModal()">Cancel</button>
+      <button class="blueprint-proceed" onclick="proceedToConfirm()">Proceed to Confirm &rarr;</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL ============ -->
 <div class="modal" id="confirmModal">
   <div class="modal-card">
@@ -1336,6 +1440,8 @@
     document.getElementById('home').scrollIntoView({ behavior: 'smooth' });
   }
 
+  let pendingBooking = null;
+
   function submitBooking(e) {
     e.preventDefault();
     const from = document.getElementById('from').value;
@@ -1349,6 +1455,19 @@
       return false;
     }
 
+    pendingBooking = { from, to, depart, ret, pax };
+    document.getElementById('blueprintModal').classList.add('open');
+    return false;
+  }
+
+  function closeBlueprintModal() {
+    document.getElementById('blueprintModal').classList.remove('open');
+    pendingBooking = null;
+  }
+
+  function proceedToConfirm() {
+    document.getElementById('blueprintModal').classList.remove('open');
+    const { from, to, depart, ret, pax } = pendingBooking;
     const summary = `
       <div><strong>Trip Type:</strong> ${tripType === 'roundtrip' ? 'Round Trip' : 'One Way'}</div>
       <div><strong>From:</strong> ${from}</div>
@@ -1359,7 +1478,7 @@
     `;
     document.getElementById('modalSummary').innerHTML = summary;
     document.getElementById('confirmModal').classList.add('open');
-    return false;
+    pendingBooking = null;
   }
 </script>
 </body>
