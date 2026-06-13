@@ -2396,14 +2396,6 @@
       ? `Fill in details for Passenger ${currentPaxIndex + 1}.`
       : 'Please fill in your details to complete the booking.';
 
-    // ID section: only show on last passenger
-    const idSection = document.getElementById('idSection');
-    if (!isLast) {
-      idSection.style.display = 'none';
-    } else {
-      idSection.style.display = '';
-    }
-
     // Restore saved data for this step (in case they went back)
     const saved = paxDataList[currentPaxIndex];
     if (saved) {
@@ -2415,6 +2407,25 @@
       document.getElementById('paxEmail').value = saved.email || '';
     } else {
       clearPaxForm();
+    }
+
+    // Restore ID upload UI (file input can't be re-set, but we can show the status)
+    document.getElementById('idFileInput').value = '';
+    if (saved && saved.idFile) {
+      document.getElementById('idFileName').textContent = '✓ ' + saved.idFile.name;
+      document.getElementById('uploadText').textContent = 'File selected — click to change';
+      if (saved.verified) {
+        document.getElementById('idScanResult').className = 'id-scan-result legit';
+        document.getElementById('idScanResult').textContent = '✅ ' + saved.idType + ' — Verified';
+      } else {
+        document.getElementById('idScanResult').className = 'id-scan-result scanning';
+        document.getElementById('idScanResult').textContent = '🪪 ID uploaded — will be verified on submit.';
+      }
+    } else {
+      document.getElementById('idFileName').textContent = '';
+      document.getElementById('uploadText').textContent = 'Click to upload your ID';
+      document.getElementById('idScanResult').className = 'id-scan-result';
+      document.getElementById('idScanResult').textContent = '';
     }
 
     // Buttons
@@ -2469,71 +2480,71 @@
     const phone    = document.getElementById('paxPhone').value.trim();
     const email    = document.getElementById('paxEmail').value.trim();
 
-    // Save this passenger's basic data
-    paxDataList[currentPaxIndex] = { surname, fullName, age, address, phone, email };
+    const newFile   = document.getElementById('idFileInput').files[0];
+    const prevSaved = paxDataList[currentPaxIndex];
+    const savedFile = prevSaved?.idFile || null;
 
-    if (!isLast) {
-      // Advance to next passenger
-      currentPaxIndex++;
-      renderPaxStep();
-      return false;
-    }
-
-    // Last passenger — run ID scan then show payment
-    const idFile   = document.getElementById('idFileInput').files[0];
-    const resultEl = document.getElementById('idScanResult');
-    const confirmBtn = document.getElementById('paxConfirmBtn');
-
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = idFile ? '🔍 Verifying ID…' : 'Processing…';
-    if (idFile) {
-      resultEl.className = 'id-scan-result scanning';
-      resultEl.textContent = '🔍 Verifying your ID, please wait…';
-    }
-
-    let idType = 'None';
-    let isLegit = true;
+    let idFile   = newFile || savedFile;
+    let idType   = 'None';
+    let isLegit  = true;
     let verified = false;
 
-    if (idFile && idFile.type !== 'application/pdf') {
+    // Reuse previous verification if no new file was uploaded
+    if (!newFile && prevSaved?.verified) {
+      idType   = prevSaved.idType;
+      verified = true;
+    }
+
+    const resultEl   = document.getElementById('idScanResult');
+    const confirmBtn = document.getElementById('paxConfirmBtn');
+    const nextLabel  = isLast ? 'Confirm Booking ✓' : `Next: Passenger ${currentPaxIndex + 2} →`;
+
+    // Scan if there's a new image file, or a saved but unverified image file
+    const fileToScan = newFile || (!prevSaved?.verified ? savedFile : null);
+    if (fileToScan && fileToScan.type !== 'application/pdf') {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = '🔍 Verifying ID…';
+      resultEl.className = 'id-scan-result scanning';
+      resultEl.textContent = '🔍 Verifying ID, please wait…';
+
       try {
         const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = ev => resolve(ev.target.result.split(',')[1]);
           reader.onerror = reject;
-          reader.readAsDataURL(idFile);
+          reader.readAsDataURL(fileToScan);
         });
         const res = await fetch('/api/scan-id', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: base64, mediaType: idFile.type })
+          body: JSON.stringify({ imageBase64: base64, mediaType: fileToScan.type })
         });
         const data = await res.json();
         if (!res.ok) {
           confirmBtn.disabled = false;
-          confirmBtn.textContent = 'Confirm Booking ✓';
+          confirmBtn.textContent = nextLabel;
           resultEl.className = 'id-scan-result suspicious';
           resultEl.textContent = '⚠️ Verification error: ' + (data.detail || data.error || 'Please try again.');
           return false;
         }
-        idType = data.idType || 'Unknown';
-        isLegit = !!data.isLegit;
+        idType   = data.idType || 'Unknown';
+        isLegit  = !!data.isLegit;
         verified = true;
       } catch (err) {
         confirmBtn.disabled = false;
-        confirmBtn.textContent = 'Confirm Booking ✓';
+        confirmBtn.textContent = nextLabel;
         resultEl.className = 'id-scan-result suspicious';
         resultEl.textContent = '⚠️ Could not reach verification service. Make sure you are on the live site, not a local file.';
         return false;
       }
-    } else if (idFile) {
+    } else if (fileToScan && fileToScan.type === 'application/pdf') {
       idType = 'PDF Document';
     }
 
     confirmBtn.disabled = false;
-    confirmBtn.textContent = 'Confirm Booking ✓';
+    confirmBtn.textContent = nextLabel;
 
-    if (!isLegit) {
+    if (idFile && !isLegit) {
       resultEl.className = 'id-scan-result suspicious';
       resultEl.textContent = '⚠️ ' + idType + ' — ID appears invalid. Please upload a clear, valid government-issued ID.';
       return false;
@@ -2544,21 +2555,24 @@
       resultEl.textContent = '✅ ' + idType + ' — Verified';
     }
 
-    // Store ID info on last passenger entry
-    paxDataList[currentPaxIndex].idType = idType;
-    paxDataList[currentPaxIndex].verified = verified;
-    paxDataList[currentPaxIndex].idFile = idFile;
+    // Save complete data for this passenger
+    paxDataList[currentPaxIndex] = { surname, fullName, age, address, phone, email, idType, verified, idFile };
 
-    // Calculate fare
-    const { from, to, pax: numPaxStr } = pendingBooking;
+    if (!isLast) {
+      currentPaxIndex++;
+      renderPaxStep();
+      return false;
+    }
+
+    // Last passenger: calculate fare, checking ALL passengers for discount eligibility
+    const { from, to } = pendingBooking;
     const numPassengers = total;
     const baseFare = FARES[`${from}-${to}`] || 0;
-    const isDiscounted = DISCOUNT_IDS.includes(idType) && verified;
+    const isDiscounted = paxDataList.some(p => p && DISCOUNT_IDS.includes(p.idType) && p.verified);
     const discountPerPax = isDiscounted ? +(baseFare * 0.02).toFixed(2) : 0;
     const farePerPax = +(baseFare - discountPerPax).toFixed(2);
     const totalFare = +(farePerPax * numPassengers).toFixed(2);
 
-    // Populate fare summary in payment modal
     document.getElementById('payRoute').textContent = `${from} → ${to}`;
     document.getElementById('payPaxCount').textContent = numPassengers;
     document.getElementById('payBaseFare').textContent = fmt(baseFare);
@@ -2571,7 +2585,7 @@
     document.getElementById('payTotal').textContent = fmt(totalFare);
     document.getElementById('payBtn').textContent = `Pay ${fmt(totalFare)} ✓`;
 
-    pendingPax = { idType, verified, idFile, baseFare, farePerPax, discountPerPax, totalFare, isDiscounted };
+    pendingPax = { baseFare, farePerPax, discountPerPax, totalFare, isDiscounted };
     selectedPayment = null;
     document.querySelectorAll('.payment-option').forEach(o => o.classList.remove('selected'));
     document.getElementById('payBtn').disabled = true;
@@ -2602,9 +2616,7 @@
     if (!selectedPayment || !pendingPax) return;
     document.getElementById('paymentModal').classList.remove('open');
 
-    const { idType, verified, idFile } = pendingPax;
     const { from, to, depart, ret, pax } = pendingBooking || {};
-    const idLabel = verified ? '✅ ' + idType : (idType && idType !== 'None' ? idType : 'None');
 
     const refNum = 'KSLi-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-' + Math.floor(1000 + Math.random() * 9000);
     document.getElementById('receiptRefNum').textContent = refNum;
@@ -2616,7 +2628,7 @@
       </div>`;
     }
 
-    // Build passenger list
+    // Build passenger list — each with their own ID status
     const total = paxDataList.length;
     let paxHtml = '';
     paxDataList.forEach((p, i) => {
@@ -2629,8 +2641,9 @@
       paxHtml += rf('Age', p.age) + rf('Phone', p.phone);
       if (p.email) paxHtml += rf('Email', p.email);
       paxHtml += rf('Address', p.address, true);
+      const idLabel = p.verified ? '✅ ' + p.idType : (p.idType && p.idType !== 'None' ? p.idType : 'None');
+      paxHtml += rf('Valid ID', idLabel, true);
     });
-    paxHtml += rf('Valid ID', idLabel, true);
     document.getElementById('receiptPaxFields').innerHTML = paxHtml;
 
     const { baseFare, farePerPax, discountPerPax, totalFare, isDiscounted } = pendingPax;
