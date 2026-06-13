@@ -954,6 +954,31 @@
     margin-bottom: 3px;
   }
   .pax-header p { font-size: 13px; color: var(--muted); }
+  .pax-step-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .pax-step-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--red);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    flex: 1;
+  }
+  .pax-step-dots { display: flex; gap: 7px; }
+  .step-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--line);
+    transition: background .25s;
+  }
+  .step-dot.active { background: var(--red); box-shadow: 0 0 0 3px rgba(200,16,46,0.18); }
+  .step-dot.done { background: #16a34a; }
   .pax-body {
     padding: 20px 26px;
     overflow-y: auto;
@@ -1986,7 +2011,11 @@
   <div class="pax-card">
     <div class="pax-header">
       <h3>&#128100; Passenger Information</h3>
-      <p>Please fill in your details to complete the booking.</p>
+      <p id="paxHeaderSub">Please fill in your details to complete the booking.</p>
+      <div class="pax-step-bar" id="paxStepBar" style="display:none">
+        <div class="pax-step-label" id="paxStepLabel">Passenger 1 of 1</div>
+        <div class="pax-step-dots" id="paxStepDots"></div>
+      </div>
     </div>
     <div class="pax-body">
       <form id="paxForm" onsubmit="return submitPaxForm(event)">
@@ -2027,7 +2056,7 @@
           </div>
         </div>
 
-        <div class="pax-row cols-1">
+        <div class="pax-row cols-1" id="idSection">
           <div class="pax-field">
             <label>Valid ID <span class="opt">(optional)</span></label>
             <label class="id-upload-label" for="idFileInput">
@@ -2046,7 +2075,7 @@
       </form>
     </div>
     <div class="pax-footer">
-      <button class="pax-back" onclick="backToBlueprint()">&larr; Back</button>
+      <button class="pax-back" id="paxBackBtn" onclick="backToBlueprint()">&larr; Back</button>
       <button class="pax-submit" id="paxConfirmBtn" onclick="document.getElementById('paxSubmitBtn').click()">Confirm Booking &#10003;</button>
     </div>
   </div>
@@ -2239,6 +2268,8 @@
   let selectedCabins = [];
   let pendingPax = null;
   let selectedPayment = null;
+  let currentPaxIndex = 0;
+  let paxDataList = [];
 
   const FARES = {
     'Mintac-Calbayog': 850,
@@ -2326,7 +2357,89 @@
     const maxCabins = parseInt(pendingBooking.pax) || 1;
     if (selectedCabins.length < maxCabins) return;
     document.getElementById('blueprintModal').classList.remove('open');
+    const total = maxCabins;
+    currentPaxIndex = 0;
+    paxDataList = new Array(total).fill(null);
+    clearPaxForm();
+    renderPaxStep();
     document.getElementById('paxModal').classList.add('open');
+  }
+
+  function clearPaxForm() {
+    ['paxFullName','paxSurname','paxAge','paxAddress','paxPhone','paxEmail'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  }
+
+  function renderPaxStep() {
+    const total = (pendingBooking && parseInt(pendingBooking.pax)) || 1;
+    const isLast = currentPaxIndex === total - 1;
+    const isFirst = currentPaxIndex === 0;
+
+    // Step bar visibility
+    const stepBar = document.getElementById('paxStepBar');
+    if (total > 1) {
+      stepBar.style.display = 'flex';
+      document.getElementById('paxStepLabel').textContent = `Passenger ${currentPaxIndex + 1} of ${total}`;
+      let dotsHtml = '';
+      for (let i = 0; i < total; i++) {
+        let cls = 'step-dot' + (i < currentPaxIndex ? ' done' : i === currentPaxIndex ? ' active' : '');
+        dotsHtml += `<div class="${cls}"></div>`;
+      }
+      document.getElementById('paxStepDots').innerHTML = dotsHtml;
+    } else {
+      stepBar.style.display = 'none';
+    }
+
+    // Header subtitle
+    document.getElementById('paxHeaderSub').textContent = total > 1
+      ? `Fill in details for Passenger ${currentPaxIndex + 1}.`
+      : 'Please fill in your details to complete the booking.';
+
+    // ID section: only show on last passenger
+    const idSection = document.getElementById('idSection');
+    if (!isLast) {
+      idSection.style.display = 'none';
+    } else {
+      idSection.style.display = '';
+    }
+
+    // Restore saved data for this step (in case they went back)
+    const saved = paxDataList[currentPaxIndex];
+    if (saved) {
+      document.getElementById('paxFullName').value = saved.fullName || '';
+      document.getElementById('paxSurname').value = saved.surname || '';
+      document.getElementById('paxAge').value = saved.age || '';
+      document.getElementById('paxAddress').value = saved.address || '';
+      document.getElementById('paxPhone').value = saved.phone || '';
+      document.getElementById('paxEmail').value = saved.email || '';
+    } else {
+      clearPaxForm();
+    }
+
+    // Buttons
+    const confirmBtn = document.getElementById('paxConfirmBtn');
+    const backBtn = document.getElementById('paxBackBtn');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = isLast
+      ? 'Confirm Booking ✓'
+      : `Next: Passenger ${currentPaxIndex + 2} →`;
+    backBtn.textContent = isFirst ? '← Back' : '← Prev';
+    backBtn.onclick = isFirst ? backToBlueprint : prevPassenger;
+  }
+
+  function prevPassenger() {
+    // Save current fields without validation
+    paxDataList[currentPaxIndex] = {
+      fullName: document.getElementById('paxFullName').value.trim(),
+      surname:  document.getElementById('paxSurname').value.trim(),
+      age:      document.getElementById('paxAge').value,
+      address:  document.getElementById('paxAddress').value.trim(),
+      phone:    document.getElementById('paxPhone').value.trim(),
+      email:    document.getElementById('paxEmail').value.trim(),
+    };
+    currentPaxIndex--;
+    renderPaxStep();
   }
 
   function backToBlueprint() {
@@ -2346,12 +2459,27 @@
 
   async function submitPaxForm(e) {
     e.preventDefault();
+    const total = (pendingBooking && parseInt(pendingBooking.pax)) || 1;
+    const isLast = currentPaxIndex === total - 1;
+
     const surname  = document.getElementById('paxSurname').value.trim();
     const fullName = document.getElementById('paxFullName').value.trim();
     const age      = document.getElementById('paxAge').value;
     const address  = document.getElementById('paxAddress').value.trim();
     const phone    = document.getElementById('paxPhone').value.trim();
     const email    = document.getElementById('paxEmail').value.trim();
+
+    // Save this passenger's basic data
+    paxDataList[currentPaxIndex] = { surname, fullName, age, address, phone, email };
+
+    if (!isLast) {
+      // Advance to next passenger
+      currentPaxIndex++;
+      renderPaxStep();
+      return false;
+    }
+
+    // Last passenger — run ID scan then show payment
     const idFile   = document.getElementById('idFileInput').files[0];
     const resultEl = document.getElementById('idScanResult');
     const confirmBtn = document.getElementById('paxConfirmBtn');
@@ -2363,7 +2491,7 @@
       resultEl.textContent = '🔍 Verifying your ID, please wait…';
     }
 
-    let idType = 'Document';
+    let idType = 'None';
     let isLegit = true;
     let verified = false;
 
@@ -2400,8 +2528,6 @@
       }
     } else if (idFile) {
       idType = 'PDF Document';
-    } else {
-      idType = 'None';
     }
 
     confirmBtn.disabled = false;
@@ -2413,19 +2539,26 @@
       return false;
     }
 
-    resultEl.className = 'id-scan-result legit';
-    resultEl.textContent = '✅ ' + idType + ' — Verified';
+    if (verified) {
+      resultEl.className = 'id-scan-result legit';
+      resultEl.textContent = '✅ ' + idType + ' — Verified';
+    }
 
-    // Calculate fare based on route
+    // Store ID info on last passenger entry
+    paxDataList[currentPaxIndex].idType = idType;
+    paxDataList[currentPaxIndex].verified = verified;
+    paxDataList[currentPaxIndex].idFile = idFile;
+
+    // Calculate fare
     const { from, to, pax: numPaxStr } = pendingBooking;
-    const numPassengers = parseInt(numPaxStr) || 1;
+    const numPassengers = total;
     const baseFare = FARES[`${from}-${to}`] || 0;
     const isDiscounted = DISCOUNT_IDS.includes(idType) && verified;
     const discountPerPax = isDiscounted ? +(baseFare * 0.02).toFixed(2) : 0;
     const farePerPax = +(baseFare - discountPerPax).toFixed(2);
     const totalFare = +(farePerPax * numPassengers).toFixed(2);
 
-    // Populate fare summary
+    // Populate fare summary in payment modal
     document.getElementById('payRoute').textContent = `${from} → ${to}`;
     document.getElementById('payPaxCount').textContent = numPassengers;
     document.getElementById('payBaseFare').textContent = fmt(baseFare);
@@ -2438,8 +2571,7 @@
     document.getElementById('payTotal').textContent = fmt(totalFare);
     document.getElementById('payBtn').textContent = `Pay ${fmt(totalFare)} ✓`;
 
-    // Store all data and show payment modal
-    pendingPax = { surname, fullName, age, address, phone, email, idType, verified, idFile, baseFare, farePerPax, discountPerPax, totalFare, isDiscounted };
+    pendingPax = { idType, verified, idFile, baseFare, farePerPax, discountPerPax, totalFare, isDiscounted };
     selectedPayment = null;
     document.querySelectorAll('.payment-option').forEach(o => o.classList.remove('selected'));
     document.getElementById('payBtn').disabled = true;
@@ -2460,6 +2592,9 @@
 
   function backToForm() {
     document.getElementById('paymentModal').classList.remove('open');
+    const total = (pendingBooking && parseInt(pendingBooking.pax)) || 1;
+    currentPaxIndex = total - 1;
+    renderPaxStep();
     document.getElementById('paxModal').classList.add('open');
   }
 
@@ -2467,9 +2602,9 @@
     if (!selectedPayment || !pendingPax) return;
     document.getElementById('paymentModal').classList.remove('open');
 
-    const { surname, fullName, age, address, phone, email, idType, verified, idFile } = pendingPax;
+    const { idType, verified, idFile } = pendingPax;
     const { from, to, depart, ret, pax } = pendingBooking || {};
-    const idLabel = verified ? '✅ ' + idType : (idFile ? idFile.name + ' (pending verification)' : 'None');
+    const idLabel = verified ? '✅ ' + idType : (idType && idType !== 'None' ? idType : 'None');
 
     const refNum = 'KSLi-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-' + Math.floor(1000 + Math.random() * 9000);
     document.getElementById('receiptRefNum').textContent = refNum;
@@ -2481,13 +2616,22 @@
       </div>`;
     }
 
-    document.getElementById('receiptPaxFields').innerHTML =
-      rf('Passenger Name', `${surname}, ${fullName}`, true) +
-      rf('Age', age) +
-      rf('Phone', phone) +
-      (email ? rf('Email', email) : '') +
-      rf('Address', address, true) +
-      rf('Valid ID', idLabel, true);
+    // Build passenger list
+    const total = paxDataList.length;
+    let paxHtml = '';
+    paxDataList.forEach((p, i) => {
+      if (!p) return;
+      if (total > 1 && i > 0) {
+        paxHtml += `<div class="receipt-field wide" style="border-top:1px dashed var(--line);margin:4px 0 2px;"></div>`;
+      }
+      const nameLabel = total > 1 ? `Passenger ${i + 1}` : 'Passenger Name';
+      paxHtml += rf(nameLabel, `${p.surname}, ${p.fullName}`, true);
+      paxHtml += rf('Age', p.age) + rf('Phone', p.phone);
+      if (p.email) paxHtml += rf('Email', p.email);
+      paxHtml += rf('Address', p.address, true);
+    });
+    paxHtml += rf('Valid ID', idLabel, true);
+    document.getElementById('receiptPaxFields').innerHTML = paxHtml;
 
     const { baseFare, farePerPax, discountPerPax, totalFare, isDiscounted } = pendingPax;
     const fareLabel = isDiscounted
