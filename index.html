@@ -2133,10 +2133,13 @@
         <span>Base Fare / person</span><b id="payBaseFare">—</b>
       </div>
       <div class="fare-line" id="payDiscountRow" style="display:none">
-        <span>Discount (2%)</span><span class="fare-disc-val" id="payDiscountAmt">—</span>
+        <span id="payDiscountLabel">2% ID Discount</span><span class="fare-disc-val" id="payDiscountAmt">—</span>
+      </div>
+      <div class="fare-line" id="payFareAfterRow" style="display:none">
+        <span>Fare per Person (after discount)</span><b id="payFareAfter">—</b>
       </div>
       <div class="fare-total-row">
-        <span class="fare-total-label">Total to Pay</span>
+        <span class="fare-total-label" id="payTotalLabel">Total to Pay</span>
         <span class="fare-total-amount" id="payTotal">—</span>
       </div>
     </div>
@@ -2577,11 +2580,20 @@
     document.getElementById('payPaxCount').textContent = numPassengers;
     document.getElementById('payBaseFare').textContent = fmt(baseFare);
     if (isDiscounted) {
+      const qualifyingPax = paxDataList.find(p => p && DISCOUNT_IDS.includes(p.idType) && p.verified);
+      const discountIdType = qualifyingPax ? qualifyingPax.idType : 'ID';
       document.getElementById('payDiscountRow').style.display = 'flex';
+      document.getElementById('payDiscountLabel').textContent = `2% Discount (${discountIdType})`;
       document.getElementById('payDiscountAmt').textContent = `− ${fmt(discountPerPax)} / person`;
+      document.getElementById('payFareAfterRow').style.display = 'flex';
+      document.getElementById('payFareAfter').textContent = fmt(farePerPax);
     } else {
       document.getElementById('payDiscountRow').style.display = 'none';
+      document.getElementById('payFareAfterRow').style.display = 'none';
     }
+    document.getElementById('payTotalLabel').textContent = numPassengers > 1
+      ? `Total to Pay (${numPassengers} × ${fmt(farePerPax)})`
+      : 'Total to Pay';
     document.getElementById('payTotal').textContent = fmt(totalFare);
     document.getElementById('payBtn').textContent = `Pay ${fmt(totalFare)} ✓`;
 
