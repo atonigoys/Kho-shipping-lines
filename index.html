@@ -2215,18 +2215,26 @@
   }
 
   function downloadReceipt() {
-    const el = document.getElementById('receiptCard');
+    const source = document.getElementById('receiptCard');
     const ref = document.getElementById('receiptRefNum').textContent || 'KSLi-Booking';
     const btn = document.querySelector('.btn-download');
     btn.textContent = 'Generating…';
     btn.disabled = true;
+
+    // Clone outside the modal so html2pdf captures the full height without scroll clipping
+    const clone = source.cloneNode(true);
+    clone.style.cssText = 'position:fixed;left:-9999px;top:0;width:520px;background:#fff;font-family:Inter,sans-serif;';
+    document.body.appendChild(clone);
+
     html2pdf().set({
-      margin: 8,
+      margin: [12, 12, 12, 12],
       filename: ref + '.pdf',
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a5', orientation: 'portrait' }
-    }).from(el).save().then(function() {
+      html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: 'avoid-all' }
+    }).from(clone).save().then(function() {
+      document.body.removeChild(clone);
       btn.textContent = '⬇ Download PDF';
       btn.disabled = false;
     });
