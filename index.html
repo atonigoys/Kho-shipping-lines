@@ -2142,6 +2142,10 @@
         <span class="fare-total-label" id="payTotalLabel">Total to Pay</span>
         <span class="fare-total-amount" id="payTotal">—</span>
       </div>
+      <div id="payIdNote" style="display:none;margin-top:10px;font-size:11px;color:var(--muted);line-height:1.6;"></div>
+      <div style="margin-top:10px;font-size:10.5px;color:var(--muted);background:#f8f8f8;border-radius:8px;padding:7px 10px;line-height:1.6;">
+        &#x2139;&#xFE0F; <strong style="color:var(--ink)">2% discount eligibility:</strong> Student ID &bull; Senior Citizen ID &bull; PWD ID
+      </div>
     </div>
 
     <div class="payment-mock-note">
@@ -2579,6 +2583,7 @@
     document.getElementById('payRoute').textContent = `${from} → ${to}`;
     document.getElementById('payPaxCount').textContent = numPassengers;
     document.getElementById('payBaseFare').textContent = fmt(baseFare);
+    const idNoteEl = document.getElementById('payIdNote');
     if (isDiscounted) {
       const qualifyingPax = paxDataList.find(p => p && DISCOUNT_IDS.includes(p.idType) && p.verified);
       const discountIdType = qualifyingPax ? qualifyingPax.idType : 'ID';
@@ -2587,9 +2592,24 @@
       document.getElementById('payDiscountAmt').textContent = `− ${fmt(discountPerPax)} / person`;
       document.getElementById('payFareAfterRow').style.display = 'flex';
       document.getElementById('payFareAfter').textContent = fmt(farePerPax);
+      idNoteEl.style.display = 'none';
     } else {
       document.getElementById('payDiscountRow').style.display = 'none';
       document.getElementById('payFareAfterRow').style.display = 'none';
+      // Show which IDs were detected and why no discount
+      const verifiedPax = paxDataList.filter(p => p && p.verified && p.idType && p.idType !== 'None');
+      if (verifiedPax.length > 0) {
+        const lines = verifiedPax.map((p, idx) => {
+          const paxLabel = paxDataList.length > 1
+            ? `Pax ${paxDataList.indexOf(p) + 1}`
+            : 'Passenger';
+          return `${paxLabel}: <strong>${p.idType}</strong> — not eligible for 2% discount`;
+        });
+        idNoteEl.innerHTML = lines.join('<br>');
+        idNoteEl.style.display = 'block';
+      } else {
+        idNoteEl.style.display = 'none';
+      }
     }
     document.getElementById('payTotalLabel').textContent = numPassengers > 1
       ? `Total to Pay (${numPassengers} × ${fmt(farePerPax)})`
