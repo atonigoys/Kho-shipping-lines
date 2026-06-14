@@ -2750,6 +2750,21 @@
       rf('Payment Method', selectedPayment) +
       rf('Total Amount Paid', `<span style="color:var(--red);font-weight:900;font-size:16px;">${fmt(totalFare)}</span>`, true);
 
+    // Capture all data for per-passenger PDF tickets before state is cleared
+    window.receiptData = {
+      refNum,
+      from, to, depart, ret, pax, tripType,
+      cabins: [...selectedCabins],
+      paymentMethod: selectedPayment,
+      totalFare,
+      passengers: paxDataList.map((p, i) => ({
+        ...(p || {}),
+        cabin: selectedCabins[i] != null ? selectedCabins[i] : null,
+        fare: (perPaxFares || [])[i]?.fare || baseFare,
+        qualifying: (perPaxFares || [])[i]?.qualifying || false
+      }))
+    };
+
     document.getElementById('confirmModal').classList.add('open');
     pendingBooking = null;
     pendingPax = null;
@@ -2757,47 +2772,125 @@
   }
 
   function downloadReceipt() {
-    const el = document.getElementById('receiptCard');
-    const ref = document.getElementById('receiptRefNum').textContent || 'KSLi-Booking';
-    const btn = document.querySelector('.btn-download');
+    const rd = window.receiptData;
+    if (!rd) { alert('No booking data found.'); return; }
 
-    // Collect all inline styles from this page
-    const styles = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('');
-
-    // Fix relative image src to absolute so they load in the new window
     const origin = window.location.origin;
-    const html = el.outerHTML.replace(/src="([^"]+)"/g, function(m, src) {
-      return (src.startsWith('http') || src.startsWith('data:')) ? m : `src="${origin}/${src}"`;
+    const logoSrc = `${origin}/KSL%20logo.png`;
+    const total = rd.passengers.length;
+
+    function fmtP(n) { return '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 }); }
+    function field(label, value) {
+      return `<div style="display:flex;flex-direction:column;gap:2px;">
+        <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#9ca3af;font-weight:700;">${label}</span>
+        <span style="font-size:13px;font-weight:700;color:#111;">${value}</span>
+      </div>`;
+    }
+
+    let ticketsHtml = '';
+    rd.passengers.forEach((p, i) => {
+      const isLast = i === total - 1;
+      const cabin = p.cabin != null ? `No. ${p.cabin}` : '—';
+      const idLabel = p.verified ? `&#9989; ${p.idType}` : (p.idType && p.idType !== 'None' ? p.idType : 'None');
+      const fareStr = fmtP(p.fare);
+      const discBadge = p.qualifying
+        ? `<span style="font-size:10px;background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:8px;font-weight:800;margin-left:6px;vertical-align:middle;">2% OFF</span>`
+        : '';
+      const tripLabel = rd.tripType === 'roundtrip' ? 'Round Trip' : 'One Way';
+      const returnRow = rd.tripType === 'roundtrip' && rd.ret
+        ? field('Return Date', rd.ret) : '';
+
+      ticketsHtml += `
+<div style="width:680px;margin:0 auto;font-family:'Inter',Arial,sans-serif;border-radius:18px;overflow:hidden;border:2px solid #e5e7eb;box-shadow:0 6px 30px rgba(0,0,0,0.12);page-break-after:${isLast ? 'auto' : 'always'};margin-bottom:${isLast ? '0' : '40px'};">
+
+  <!-- Red header -->
+  <div style="background:#c8102e;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <img src="${logoSrc}" style="width:56px;height:56px;border-radius:50%;background:#fff;object-fit:contain;flex-shrink:0;" />
+      <div>
+        <div style="color:#fff;font-size:18px;font-weight:900;letter-spacing:0.2px;">Kho Shipping Lines Inc.</div>
+        <div style="color:rgba(255,255,255,0.75);font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;margin-top:2px;">KSLI &bull; Mintac, Masbate &bull; Safe &amp; Reliable Sea Travel</div>
+      </div>
+    </div>
+    <div style="text-align:right;flex-shrink:0;">
+      <div style="color:rgba(255,255,255,0.65);font-size:9px;text-transform:uppercase;letter-spacing:1px;">Passenger</div>
+      <div style="color:#fff;font-size:26px;font-weight:900;line-height:1;">${i + 1}<span style="font-size:14px;font-weight:600;"> / ${total}</span></div>
+    </div>
+  </div>
+
+  <!-- Body: passenger left | route right -->
+  <div style="display:flex;">
+
+    <!-- Left: passenger details -->
+    <div style="flex:1;padding:22px 28px;border-right:2px dashed #e5e7eb;">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#6b7280;margin-bottom:6px;">Passenger Name</div>
+      <div style="font-size:24px;font-weight:900;color:#111;text-transform:uppercase;line-height:1.1;letter-spacing:0.3px;">${(p.surname || '').toUpperCase()}, ${(p.fullName || '').toUpperCase()}</div>
+      <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        ${field('Age', p.age || '—')}
+        ${field('Cabin', cabin)}
+        ${field('Phone', p.phone || '—')}
+        ${field('Valid ID', idLabel)}
+      </div>
+      ${p.address ? `<div style="margin-top:14px;">${field('Address', p.address)}</div>` : ''}
+      ${p.email ? `<div style="margin-top:10px;">${field('Email', p.email)}</div>` : ''}
+    </div>
+
+    <!-- Right: trip details -->
+    <div style="padding:22px 28px;min-width:210px;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#6b7280;margin-bottom:8px;">Route</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:17px;font-weight:900;color:#c8102e;">${rd.from}</div>
+          <div style="font-size:16px;color:#c8102e;font-weight:900;">&rarr;</div>
+          <div style="font-size:17px;font-weight:900;color:#c8102e;">${rd.to}</div>
+        </div>
+      </div>
+      ${field('Departure', rd.depart)}
+      ${returnRow}
+      ${field('Trip Type', tripLabel)}
+      ${field('Ref. No.', rd.refNum)}
+    </div>
+  </div>
+
+  <!-- Footer: fare -->
+  <div style="background:#f9fafb;border-top:1.5px solid #e5e7eb;padding:16px 28px;display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#9ca3af;font-weight:700;">Fare Paid</div>
+      <div style="font-size:26px;font-weight:900;color:#c8102e;margin-top:3px;">${fareStr}${discBadge}</div>
+      <div style="font-size:11px;color:#6b7280;margin-top:3px;">via ${rd.paymentMethod}</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="background:#16a34a;color:#fff;padding:6px 18px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">&#10004; CONFIRMED</div>
+      ${total > 1 ? `<div style="font-size:10px;color:#9ca3af;margin-top:6px;">Total booking: ${fmtP(rd.totalFare)} (${total} pax)</div>` : ''}
+    </div>
+  </div>
+
+</div>`;
     });
 
     const win = window.open('', '_blank');
-    if (!win) {
-      alert('Please allow pop-ups for this site, then try again.');
-      return;
-    }
+    if (!win) { alert('Please allow pop-ups for this site, then try again.'); return; }
 
     win.document.write(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>${ref} — KSLi Booking Receipt</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-  ${styles}
+  <title>${rd.refNum} — KSLi Tickets</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    body { margin: 0; padding: 28px; background: #fff; font-family: 'Inter', sans-serif; }
-    .receipt-wrapper { box-shadow: none; max-height: none; overflow: visible; border-radius: 0; }
-    .receipt-watermark { display: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f3f4f6; padding: 32px; font-family: 'Inter', Arial, sans-serif; }
     @media print {
-      body { padding: 0; }
-      @page { margin: 12mm; size: A4 portrait; }
+      body { background: #fff; padding: 0; }
+      @page { size: A4; margin: 12mm; }
     }
   </style>
 </head>
 <body>
-  <div class="receipt-wrapper">${html}</div>
+  ${ticketsHtml}
   <script>
     document.fonts.ready.then(function() {
-      setTimeout(function() { window.print(); }, 400);
+      setTimeout(function() { window.print(); }, 500);
     });
   <\/script>
 </body>
