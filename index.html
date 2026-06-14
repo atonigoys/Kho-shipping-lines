@@ -2223,9 +2223,14 @@
     </div>
 
     <!-- Buttons (not included in PDF) -->
-    <div class="receipt-actions">
-      <button class="btn-download" onclick="downloadReceipt()">&#11015; Download PDF</button>
-      <button class="btn-close-receipt" onclick="document.getElementById('confirmModal').classList.remove('open')">Close</button>
+    <div class="receipt-actions" style="flex-direction:column;align-items:stretch;gap:10px;">
+      <div style="background:#fff3cd;border:1.5px solid #f59e0b;border-radius:10px;padding:10px 16px;text-align:center;font-size:12px;font-weight:800;color:#92400e;letter-spacing:0.5px;">
+        &#128247; PLEASE DOWNLOAD OR SCREENSHOT YOUR TICKET
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn-download" onclick="downloadReceipt()">&#11015; Download PDF</button>
+        <button class="btn-close-receipt" onclick="document.getElementById('confirmModal').classList.remove('open')">Close</button>
+      </div>
     </div>
 
   </div>
