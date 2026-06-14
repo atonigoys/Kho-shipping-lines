@@ -1446,6 +1446,16 @@
   .fare-line:last-child { border-bottom: none; }
   .fare-line b { color: var(--ink); }
   .fare-disc-val { color: #16a34a; font-weight: 700; }
+  .pax-fare-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 6px 0; font-size: 13px; color: var(--ink-soft);
+    border-bottom: 1px dashed var(--line);
+    gap: 8px;
+  }
+  .pax-fare-row:last-child { border-bottom: none; }
+  .pax-fare-name { display: flex; flex-direction: column; gap: 2px; }
+  .pax-fare-id { font-size: 10px; color: var(--muted); }
+  .pax-fare-amt { font-weight: 700; color: var(--ink); white-space: nowrap; text-align: right; }
   .fare-total-row {
     display: flex; justify-content: space-between; align-items: center;
     padding: 10px 0 0; margin-top: 8px; border-top: 2px solid var(--line);
@@ -2132,6 +2142,8 @@
       <div class="fare-line">
         <span>Base Fare / person</span><b id="payBaseFare">—</b>
       </div>
+      <!-- per-passenger breakdown (multi-pax only) -->
+      <div id="payPaxBreakdown" style="display:none"></div>
       <div class="fare-line" id="payDiscountRow" style="display:none">
         <span id="payDiscountLabel">2% ID Discount</span><span class="fare-disc-val" id="payDiscountAmt">—</span>
       </div>
@@ -2571,53 +2583,82 @@
       return false;
     }
 
-    // Last passenger: calculate fare, checking ALL passengers for discount eligibility
+    // Per-passenger fare: only the passenger with qualifying ID gets 2% off
     const { from, to } = pendingBooking;
     const numPassengers = total;
     const baseFare = FARES[`${from}-${to}`] || 0;
-    const isDiscounted = paxDataList.some(p => p && DISCOUNT_IDS.includes(p.idType) && p.verified);
-    const discountPerPax = isDiscounted ? +(baseFare * 0.02).toFixed(2) : 0;
-    const farePerPax = +(baseFare - discountPerPax).toFixed(2);
-    const totalFare = +(farePerPax * numPassengers).toFixed(2);
+    const perPaxFares = paxDataList.map(p => {
+      const qualifying = p && DISCOUNT_IDS.includes(p.idType) && p.verified;
+      const disc = qualifying ? +(baseFare * 0.02).toFixed(2) : 0;
+      return { fare: +(baseFare - disc).toFixed(2), discount: disc, qualifying };
+    });
+    const totalFare = +perPaxFares.reduce((sum, pf) => sum + pf.fare, 0).toFixed(2);
+    const isDiscounted = perPaxFares.some(pf => pf.qualifying);
 
     document.getElementById('payRoute').textContent = `${from} → ${to}`;
     document.getElementById('payPaxCount').textContent = numPassengers;
     document.getElementById('payBaseFare').textContent = fmt(baseFare);
+
+    const breakdownEl = document.getElementById('payPaxBreakdown');
     const idNoteEl = document.getElementById('payIdNote');
-    if (isDiscounted) {
-      const qualifyingPax = paxDataList.find(p => p && DISCOUNT_IDS.includes(p.idType) && p.verified);
-      const discountIdType = qualifyingPax ? qualifyingPax.idType : 'ID';
-      document.getElementById('payDiscountRow').style.display = 'flex';
-      document.getElementById('payDiscountLabel').textContent = `2% Discount (${discountIdType})`;
-      document.getElementById('payDiscountAmt').textContent = `− ${fmt(discountPerPax)} / person`;
-      document.getElementById('payFareAfterRow').style.display = 'flex';
-      document.getElementById('payFareAfter').textContent = fmt(farePerPax);
-      idNoteEl.style.display = 'none';
-    } else {
+
+    if (numPassengers > 1) {
+      // Multi-pax: show per-passenger fare breakdown, hide generic rows
       document.getElementById('payDiscountRow').style.display = 'none';
       document.getElementById('payFareAfterRow').style.display = 'none';
-      // Show which IDs were detected and why no discount
-      const verifiedPax = paxDataList.filter(p => p && p.verified && p.idType && p.idType !== 'None');
-      if (verifiedPax.length > 0) {
-        const lines = verifiedPax.map((p, idx) => {
-          const paxLabel = paxDataList.length > 1
-            ? `Pax ${paxDataList.indexOf(p) + 1}`
-            : 'Passenger';
-          return `${paxLabel}: <strong>${p.idType}</strong> — not eligible for 2% discount`;
-        });
-        idNoteEl.innerHTML = lines.join('<br>');
-        idNoteEl.style.display = 'block';
-      } else {
+      idNoteEl.style.display = 'none';
+
+      let html = '';
+      paxDataList.forEach((p, i) => {
+        const pf = perPaxFares[i];
+        const name = p ? `${p.fullName} ${p.surname}` : `Pax ${i + 1}`;
+        const discTag = pf.qualifying
+          ? `<span style="font-size:10px;background:#dcfce7;color:#16a34a;padding:1px 5px;border-radius:6px;font-weight:700;margin-left:5px;">2% OFF</span>`
+          : '';
+        let idLine = '';
+        if (p?.verified && p.idType && p.idType !== 'None') {
+          idLine = `<span class="pax-fare-id">${p.idType}${pf.qualifying ? ' — discount applied' : ' — no discount'}</span>`;
+        } else {
+          idLine = `<span class="pax-fare-id">No qualifying ID</span>`;
+        }
+        html += `<div class="pax-fare-row">
+          <div class="pax-fare-name"><span>Pax ${i + 1}: ${name}</span>${idLine}</div>
+          <div class="pax-fare-amt">${fmt(pf.fare)}${discTag}</div>
+        </div>`;
+      });
+      breakdownEl.innerHTML = html;
+      breakdownEl.style.display = '';
+    } else {
+      // Single pax: use the classic discount rows
+      breakdownEl.innerHTML = '';
+      breakdownEl.style.display = 'none';
+      if (isDiscounted) {
+        const qualPax = paxDataList.find(p => p && DISCOUNT_IDS.includes(p.idType) && p.verified);
+        const discAmt = perPaxFares[0].discount;
+        document.getElementById('payDiscountRow').style.display = 'flex';
+        document.getElementById('payDiscountLabel').textContent = `2% Discount (${qualPax?.idType || 'ID'})`;
+        document.getElementById('payDiscountAmt').textContent = `− ${fmt(discAmt)}`;
+        document.getElementById('payFareAfterRow').style.display = 'flex';
+        document.getElementById('payFareAfter').textContent = fmt(perPaxFares[0].fare);
         idNoteEl.style.display = 'none';
+      } else {
+        document.getElementById('payDiscountRow').style.display = 'none';
+        document.getElementById('payFareAfterRow').style.display = 'none';
+        const verifiedNonQual = paxDataList.filter(p => p && p.verified && p.idType && p.idType !== 'None');
+        if (verifiedNonQual.length > 0) {
+          idNoteEl.innerHTML = verifiedNonQual.map(p => `<strong>${p.idType}</strong> — not eligible for 2% discount`).join('<br>');
+          idNoteEl.style.display = 'block';
+        } else {
+          idNoteEl.style.display = 'none';
+        }
       }
     }
-    document.getElementById('payTotalLabel').textContent = numPassengers > 1
-      ? `Total to Pay (${numPassengers} × ${fmt(farePerPax)})`
-      : 'Total to Pay';
+
+    document.getElementById('payTotalLabel').textContent = 'Total to Pay';
     document.getElementById('payTotal').textContent = fmt(totalFare);
     document.getElementById('payBtn').textContent = `Pay ${fmt(totalFare)} ✓`;
 
-    pendingPax = { baseFare, farePerPax, discountPerPax, totalFare, isDiscounted };
+    pendingPax = { baseFare, perPaxFares, totalFare, isDiscounted };
     selectedPayment = null;
     document.querySelectorAll('.payment-option').forEach(o => o.classList.remove('selected'));
     document.getElementById('payBtn').disabled = true;
@@ -2678,10 +2719,24 @@
     });
     document.getElementById('receiptPaxFields').innerHTML = paxHtml;
 
-    const { baseFare, farePerPax, discountPerPax, totalFare, isDiscounted } = pendingPax;
-    const fareLabel = isDiscounted
-      ? `${fmt(farePerPax)} <span style="font-size:10px;background:#dcfce7;color:#16a34a;padding:2px 6px;border-radius:8px;font-weight:700;">2% OFF</span>`
-      : fmt(farePerPax);
+    const { baseFare, perPaxFares, totalFare, isDiscounted } = pendingPax;
+
+    // Build per-passenger fare breakdown for receipt
+    let fareBreakdown = '';
+    if (perPaxFares && perPaxFares.length > 1) {
+      perPaxFares.forEach((pf, i) => {
+        const discTag = pf.qualifying
+          ? ` <span style="font-size:10px;background:#dcfce7;color:#16a34a;padding:2px 5px;border-radius:6px;font-weight:700;">2% OFF</span>`
+          : '';
+        fareBreakdown += rf(`Pax ${i + 1} Fare`, fmt(pf.fare) + discTag);
+      });
+    } else {
+      const pf = perPaxFares?.[0];
+      const discTag = pf?.qualifying
+        ? ` <span style="font-size:10px;background:#dcfce7;color:#16a34a;padding:2px 5px;border-radius:6px;font-weight:700;">2% OFF</span>`
+        : '';
+      fareBreakdown = rf('Fare per Person', fmt(pf?.fare ?? baseFare) + discTag);
+    }
 
     document.getElementById('receiptTripFields').innerHTML =
       rf('Trip Type', tripType === 'roundtrip' ? 'Round Trip' : 'One Way') +
@@ -2691,7 +2746,7 @@
       rf('Departure', depart) +
       (tripType === 'roundtrip' ? rf('Return Date', ret) : '') +
       rf('No. of Passengers', pax) +
-      rf('Fare per Person', fareLabel) +
+      fareBreakdown +
       rf('Payment Method', selectedPayment) +
       rf('Total Amount Paid', `<span style="color:var(--red);font-weight:900;font-size:16px;">${fmt(totalFare)}</span>`, true);
 
