@@ -2848,7 +2848,7 @@
       ${field('Departure', rd.depart)}
       ${returnRow}
       ${field('Trip Type', tripLabel)}
-      ${field('Ref. No.', rd.refNum)}
+      ${field('Ticket No.', total > 1 ? rd.refNum + '-T' + (i + 1) : rd.refNum)}
     </div>
   </div>
 
